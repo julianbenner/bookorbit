@@ -10,7 +10,7 @@ const props = defineProps<{
   isActive: boolean
   isReadOnly?: boolean
   searchFn?: (q: string) => Promise<string[]>
-  linkFn?: (chip: string) => string | null
+  linkFn?: (chip: string, index: number) => string | null
   chipActionFn?: (chip: string) => void
 }>()
 
@@ -84,8 +84,8 @@ function handleChipAction(chip: string) {
           <template v-if="value.length > 0">
             <template v-for="(chip, idx) in value.slice(0, 2)" :key="idx">
               <RouterLink
-                v-if="linkFn?.(chip)"
-                :to="linkFn(chip)!"
+                v-if="linkFn?.(chip, idx)"
+                :to="linkFn(chip, idx)!"
                 class="rounded-full bg-muted px-1.5 py-0.5 text-xs text-primary hover:underline"
                 @click.stop
               >

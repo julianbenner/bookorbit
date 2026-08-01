@@ -26,7 +26,7 @@ function normalizeTab(value: unknown): Tab {
   return typeof value === 'string' && TABS.includes(value as Tab) ? (value as Tab) : 'built-in'
 }
 
-const { activeTab, selectTab } = useRouteTab<Tab>({
+const { activeTab, tabTarget } = useRouteTab<Tab>({
   routeName: 'settings-metadata-providers',
   normalize: normalizeTab,
   availableTabs: TABS,
@@ -66,7 +66,7 @@ function handleExternalProvidersChanged() {
 </script>
 
 <template>
-  <SettingsTabs :tabs="tabs" :active-tab="activeTab" @select="selectTab" />
+  <SettingsTabs :tabs="tabs" :active-tab="activeTab" :tab-to="tabTarget" />
 
   <!-- Hidden rather than unmounted, so unsaved switches and keys survive a look at the other tab. -->
   <ProviderConfigPanel

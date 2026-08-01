@@ -1,14 +1,19 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import BookListRow from '../BookListRow.vue'
 import type { BookCard } from '@bookorbit/types'
+import { defineComponent } from 'vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
-const routerPushMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>())
-
-vi.mock('vue-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('vue-router')>()
-  return { ...actual, useRouter: () => ({ push: routerPushMock }) }
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: {
+    to: {
+      type: [String, Object],
+      required: true,
+    },
+  },
+  template: '<a><slot /></a>',
 })
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
   useCoverVersions: () => ({ coverUrl: (bookId: number) => `/cover-${bookId}.jpg`, bumpVersion: vi.fn<(...args: unknown[]) => void>() }),
@@ -27,6 +32,7 @@ vi.mock('@/features/book/lib/book-cover', () => ({
 
 const globalStubs = {
   stubs: {
+    RouterLink: RouterLinkStub,
     DropdownMenu: { template: '<div><slot /></div>' },
     DropdownMenuContent: { template: '<div><slot /></div>' },
     DropdownMenuItem: { template: '<div><slot /></div>' },
@@ -40,10 +46,6 @@ const globalStubs = {
 
 const { bookSpineOverlay, thumbnailClickAction } = useDisplaySettings()
 
-beforeEach(() => {
-  routerPushMock.mockClear()
-})
-
 afterEach(() => {
   bookSpineOverlay.value = 'off'
   thumbnailClickAction.value = 'reader'
@@ -55,6 +57,7 @@ const missingBook: BookCard = {
   coverAspectRatio: '2/3',
   title: 'Gone Book',
   authors: ['Test Author'],
+  authorIds: [7],
   seriesName: null,
   seriesIndex: null,
   files: [],
@@ -87,6 +90,7 @@ const presentBook: BookCard = {
   coverAspectRatio: '2/3',
   title: 'Available Book',
   authors: ['Test Author'],
+  authorIds: [7],
   seriesName: null,
   seriesIndex: null,
   files: [{ id: 10, format: 'epub', role: 'primary', sizeBytes: null }],
@@ -118,6 +122,7 @@ const collapsedSeriesBook: BookCard = {
   id: 20,
   title: 'Representative Volume',
   authors: ['Series Author'],
+  authorIds: [8],
   seriesId: 99,
   seriesName: 'The Trilogy',
   seriesIndex: '1',
@@ -159,15 +164,6 @@ describe('BookListRow - missing state', () => {
     const root = wrapper.find('.flex.items-center')
     expect(root.classes().join(' ')).not.toContain('hover:bg-muted')
   })
-
-  it('opens book details for missing books when thumbnail clicks prefer details', async () => {
-    thumbnailClickAction.value = 'details'
-    const wrapper = mount(BookListRow, { props: { book: missingBook }, global: globalStubs })
-
-    await wrapper.find('.flex.items-center').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 1 } })
-  })
 })
 
 describe('BookListRow - present state', () => {
@@ -177,19 +173,14 @@ describe('BookListRow - present state', () => {
     await wrapper.find('.flex.items-center').trigger('click')
 
     expect(wrapper.emitted('action')?.[0]).toEqual(['quick-view'])
-    expect(routerPushMock).not.toHaveBeenCalled()
   })
 
-  it('opens book details on row click when thumbnail clicks prefer details', async () => {
-    thumbnailClickAction.value = 'details'
-    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+  it('renders the author line as plain text when no author id is known', () => {
+    const wrapper = mount(BookListRow, { props: { book: { ...presentBook, authorIds: [] } }, global: globalStubs })
 
-    await wrapper.find('.flex.items-center').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 2 } })
-    expect(wrapper.emitted('action')).toBeUndefined()
+    expect(wrapper.findAllComponents(RouterLinkStub).some((candidate) => candidate.text().trim() === 'Test Author')).toBe(false)
+    expect(wrapper.text()).toContain('Test Author')
   })
-
   it('selects instead of navigating in selection mode', async () => {
     thumbnailClickAction.value = 'details'
     const wrapper = mount(BookListRow, { props: { book: presentBook, selectionMode: true }, global: globalStubs })
@@ -197,19 +188,17 @@ describe('BookListRow - present state', () => {
     await wrapper.find('.flex.items-center').trigger('click')
 
     expect(wrapper.emitted('select')).toHaveLength(1)
-    expect(routerPushMock).not.toHaveBeenCalled()
+    expect(wrapper.findAllComponents(RouterLinkStub)).toHaveLength(0)
   })
 
-  it('keeps the explicit format button opening the reader when thumbnail clicks prefer details', async () => {
-    thumbnailClickAction.value = 'details'
+  it.each([{ ctrlKey: true }, { metaKey: true }, {}])('does not open quick view when an author link is clicked with %o', async (modifiers) => {
     const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+    const authorLink = wrapper.findAll('a').find((link) => link.text().trim() === 'Test Author')!
 
-    const formatButton = wrapper.findAll('button').find((button) => button.text() === 'EPUB')
-    expect(formatButton).toBeDefined()
-    await formatButton!.trigger('click')
+    await authorLink.trigger('click', { button: 0, ...modifiers })
 
-    expect(routerPushMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'reader', params: { bookId: 2, fileId: 10 } }))
-    expect(routerPushMock).not.toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 2 } })
+    expect(wrapper.emitted('action')).toBeUndefined()
+    expect(wrapper.emitted('select')).toBeUndefined()
   })
 
   it('does not apply grayscale to the root row', () => {
@@ -298,17 +287,6 @@ describe('BookListRow collapsed series', () => {
     expect(wrapper.findAll('img').map((img) => img.attributes('src'))).toEqual(['/cover-20.jpg', '/cover-21.jpg', '/cover-22.jpg'])
   })
 
-  it('opens the series detail route on row click', async () => {
-    thumbnailClickAction.value = 'details'
-    const wrapper = mount(BookListRow, { props: { book: collapsedSeriesBook }, global: globalStubs })
-
-    await wrapper.get('[data-testid="collapsed-series-list-row"]').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith({ name: 'series-detail', params: { seriesId: 99 } })
-    expect(routerPushMock).not.toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 20 } })
-    expect(wrapper.emitted('action')).toBeUndefined()
-  })
-
   it('does not select a representative book or navigate in selection mode', async () => {
     const wrapper = mount(BookListRow, {
       props: { book: collapsedSeriesBook, selectionMode: true },
@@ -318,7 +296,7 @@ describe('BookListRow collapsed series', () => {
     await wrapper.get('[data-testid="collapsed-series-list-row"]').trigger('click')
 
     expect(wrapper.emitted('select')).toBeUndefined()
-    expect(routerPushMock).not.toHaveBeenCalled()
+    expect(wrapper.findAllComponents(RouterLinkStub)).toHaveLength(0)
     expect(wrapper.find('[data-testid="book-selection-checkbox"]').exists()).toBe(false)
   })
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ChevronRight } from '@lucide/vue'
 import type { SeriesSummary } from '@bookorbit/types'
@@ -10,11 +11,7 @@ import SeriesVolumeTrack from './SeriesVolumeTrack.vue'
 import SeriesLibraryChip from './SeriesLibraryChip.vue'
 import { parseAddedAt, seriesAuthorLine, seriesExtraAuthorCount, seriesRowFacts, seriesCoverSlots } from '../lib/series-summary'
 
-const props = defineProps<{ series: SeriesSummary }>()
-
-const emit = defineEmits<{
-  open: [seriesId: number]
-}>()
+const props = defineProps<{ series: SeriesSummary; to: RouteLocationRaw }>()
 
 const { t } = useI18n()
 const { coverUrl } = useCoverVersions()
@@ -62,22 +59,16 @@ const addedLabel = computed(() => {
 })
 
 const rowLabel = computed(() => t('series.card.label', { name: props.series.name, read: facts.value.readVolumes, total: facts.value.ownedVolumes }))
-
-function handleOpen() {
-  emit('open', props.series.id)
-}
 </script>
 
 <template>
-  <div
-    class="series-index-row cursor-pointer border-b border-border transition-colors last:border-b-0 hover:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-    tabindex="0"
-    role="row"
-    :aria-label="rowLabel"
-    @click="handleOpen"
-    @keydown.enter="handleOpen"
-    @keydown.space.prevent="handleOpen"
-  >
+  <div class="series-index-row border-b border-border transition-colors last:border-b-0 hover:bg-surface-2" role="row">
+    <RouterLink
+      :to="to"
+      :aria-label="rowLabel"
+      class="absolute inset-0 z-10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+    />
+
     <div class="cell-covers flex h-full min-w-0 items-center">
       <div
         v-for="(slot, i) in covers"
@@ -142,6 +133,7 @@ function handleOpen() {
 
 <style scoped>
 .series-index-row {
+  position: relative;
   display: grid;
   align-items: center;
   gap: 0 14px;
@@ -154,7 +146,7 @@ function handleOpen() {
 }
 
 .series-index-row:hover .row-go,
-.series-index-row:focus-visible .row-go {
+.series-index-row:has(a:focus-visible) .row-go {
   opacity: 1;
 }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { BadgeQuestionMark, ExternalLink, Info, KeyRound, LogOut, Settings, Sparkles, User } from '@lucide/vue'
 import { Permission } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,7 @@ import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import NotificationSheet from '@/features/notifications/components/NotificationSheet.vue'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 import { useThemeStore } from '@/stores/theme'
 
 const props = defineProps<{ isRail: boolean; isMobile: boolean }>()
@@ -32,7 +33,6 @@ const emit = defineEmits<{ navigate: [] }>()
 const DOCUMENTATION_URL = 'https://bookorbit.app/what-is-bookorbit'
 
 const { t } = useI18n()
-const router = useRouter()
 const { user, logout } = useAuth()
 const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 const { open: openChangePassword } = useChangePasswordDialog()
@@ -67,21 +67,9 @@ const canChangePassword = computed(
 )
 const canAccessNotifications = computed(() => hasPermission(Permission.NotificationAccess) && !isDemoRestrictedAccount.value)
 
-function goTo(name: string) {
+function handleNavigate(event: MouseEvent) {
+  if (!isPlainPrimaryClick(event)) return
   emit('navigate')
-  void router.push({ name })
-}
-
-function navigateToAccount() {
-  goTo('settings-account')
-}
-
-function navigateToSettings() {
-  goTo('settings-libraries')
-}
-
-function navigateToWhatsNew() {
-  goTo('whats-new')
 }
 
 function handleChangePassword() {
@@ -118,9 +106,11 @@ function handleLogout() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem @click="navigateToAccount">
-            <User :size="13" class="mr-2 text-muted-foreground" />
-            {{ t('components.appHeader.account') }}
+          <DropdownMenuItem as-child>
+            <RouterLink :to="{ name: 'settings-account' }" @click="handleNavigate">
+              <User :size="13" class="mr-2 text-muted-foreground" />
+              {{ t('components.appHeader.account') }}
+            </RouterLink>
           </DropdownMenuItem>
           <DropdownMenuItem v-if="canChangePassword" @click="handleChangePassword">
             <KeyRound :size="13" class="mr-2 text-muted-foreground" />
@@ -165,10 +155,12 @@ function handleLogout() {
                   <ExternalLink :size="12" class="ml-auto text-muted-foreground" />
                 </a>
               </DropdownMenuItem>
-              <DropdownMenuItem @click="navigateToWhatsNew">
-                <Sparkles :size="14" class="mr-2 text-muted-foreground" />
-                {{ t('components.appHeader.whatsNew') }}
-                <span v-if="hasUnseenWhatsNew" class="ml-auto h-1.5 w-1.5 rounded-full bg-primary" :aria-label="t('components.appHeader.new')" />
+              <DropdownMenuItem as-child>
+                <RouterLink :to="{ name: 'whats-new' }" @click="handleNavigate">
+                  <Sparkles :size="14" class="mr-2 text-muted-foreground" />
+                  {{ t('components.appHeader.whatsNew') }}
+                  <span v-if="hasUnseenWhatsNew" class="ml-auto h-1.5 w-1.5 rounded-full bg-primary" :aria-label="t('components.appHeader.new')" />
+                </RouterLink>
               </DropdownMenuItem>
               <DropdownMenuItem @click="handleAbout">
                 <Info :size="14" class="mr-2 text-muted-foreground" />
@@ -184,8 +176,10 @@ function handleLogout() {
 
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" :class="controlClass" :aria-label="t('components.appHeader.settings')" @click="navigateToSettings">
-              <Settings :size="15" aria-hidden="true" />
+            <Button as-child variant="ghost" size="icon" :class="controlClass" :aria-label="t('components.appHeader.settings')">
+              <RouterLink :to="{ name: 'settings-libraries' }" @click="handleNavigate">
+                <Settings :size="15" aria-hidden="true" />
+              </RouterLink>
             </Button>
           </TooltipTrigger>
           <TooltipContent :side="tooltipSide">{{ t('components.appHeader.settings') }}</TooltipContent>

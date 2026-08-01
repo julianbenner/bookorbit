@@ -33,7 +33,6 @@ const insightsMock = vi.hoisted(() => ({
 }))
 
 vi.mock('../composables/useSharedReadingInsights', () => ({ useSharedReadingInsights: () => insightsMock }))
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn<(location: unknown) => void>() }) }))
 
 describe('SharedReadingInsightsPage', () => {
   beforeEach(() => {

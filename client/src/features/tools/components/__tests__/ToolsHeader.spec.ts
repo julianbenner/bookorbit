@@ -11,14 +11,14 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
 }))
 
 vi.mock('vue-router', () => ({
+  RouterLink: { props: ['to'], template: '<a><slot /></a>' },
   useRoute: () => ({ name: 'tools-duplicate-books' }),
-  useRouter: () => ({ push: vi.fn<(location: unknown) => void>() }),
 }))
 
 function sectionLabels(): string[] {
   return mount(ToolsHeader)
-    .findAll('button')
-    .map((button) => button.text())
+    .findAll('a')
+    .map((link) => link.text())
 }
 
 describe('ToolsHeader', () => {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ChevronDown, ChevronUp } from '@lucide/vue'
 import { formatNumber } from '@/i18n/formatters'
@@ -14,10 +15,10 @@ const props = defineProps<{
   rowHeight: number
   /** Distance the sticky column head keeps from the top of the scroller. */
   headerOffset: number
+  seriesTo: (seriesId: number) => RouteLocationRaw
 }>()
 
 const emit = defineEmits<{
-  open: [seriesId: number]
   sort: [field: SeriesListSort]
 }>()
 
@@ -35,10 +36,6 @@ const coverHeight = computed(() => props.rowHeight - 18)
 
 function handleSort(field: SeriesListSort | null) {
   if (field) emit('sort', field)
-}
-
-function handleOpen(seriesId: number) {
-  emit('open', seriesId)
 }
 </script>
 
@@ -78,7 +75,7 @@ function handleOpen(seriesId: number) {
         <span class="font-medium tabular-nums text-muted-foreground">{{ formatNumber(group.items.length) }}</span>
         <span class="h-px flex-1 bg-border" />
       </div>
-      <SeriesIndexRow v-for="series in group.items" :key="series.id" :series="series" @open="handleOpen" />
+      <SeriesIndexRow v-for="series in group.items" :key="series.id" :series="series" :to="seriesTo(series.id)" />
     </template>
   </div>
 </template>

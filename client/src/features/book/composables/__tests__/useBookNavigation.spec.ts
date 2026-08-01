@@ -11,6 +11,7 @@ function makeBook(id: number): BookCard {
     coverAspectRatio: '2/3',
     title: `Book ${id}`,
     authors: [],
+    authorIds: [],
     seriesName: null,
     seriesIndex: null,
     files: [],

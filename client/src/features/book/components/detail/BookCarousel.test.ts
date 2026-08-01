@@ -1,16 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 import BookCarousel, { type CarouselBook } from './BookCarousel.vue'
 import { clearCoverLoadCache } from '@/features/book/lib/cover-load-cache'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
-
-const mockRouterPush = vi.fn<() => void>()
-
-vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: mockRouterPush }),
-}))
 
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
   useCoverVersions: () => ({
@@ -68,6 +63,15 @@ function mountCarousel(
       showHeader: options.showHeader ?? true,
     },
     global: {
+      plugins: [
+        createRouter({
+          history: createMemoryHistory(),
+          routes: [
+            { path: '/', component: { template: '<div />' } },
+            { path: '/book/:bookId', name: 'book-detail', component: { template: '<div />' } },
+          ],
+        }),
+      ],
       stubs: { ChevronLeft: true, ChevronRight: true },
     },
   })
@@ -90,7 +94,6 @@ describe('BookCarousel', () => {
     vi.clearAllMocks()
     clearCoverLoadCache()
     bookSpineOverlay.value = 'off'
-    mockRouterPush.mockReset()
   })
 
   afterEach(() => {
@@ -303,10 +306,21 @@ describe('BookCarousel', () => {
     expect(wrapper.find('[data-book-id="77"]').exists()).toBe(true)
   })
 
-  it('navigates to book detail on card click', async () => {
+  it('follows a book card without overriding browser modifier-click navigation', async () => {
     const wrapper = mountCarousel([makeBook({ id: 77 })])
-    await wrapper.find('[data-book-id="77"]').trigger('click')
-    expect(mockRouterPush).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 77 } })
+    await flushPromises()
+    const link = wrapper.get('a[data-book-id="77"]')
+    expect(link.attributes('href')).toBe('/book/77')
+
+    const modifiedClick = new MouseEvent('click', { button: 0, metaKey: true, cancelable: true })
+    link.element.dispatchEvent(modifiedClick)
+    await flushPromises()
+    expect(modifiedClick.defaultPrevented).toBe(false)
+    expect(wrapper.vm.$router.currentRoute.value.fullPath).toBe('/')
+
+    await link.trigger('click')
+    await flushPromises()
+    expect(wrapper.vm.$router.currentRoute.value.fullPath).toBe('/book/77')
   })
 
   it('scrolls carousel left and right from header controls', async () => {

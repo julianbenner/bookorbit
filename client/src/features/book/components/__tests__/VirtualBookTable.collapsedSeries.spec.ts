@@ -37,6 +37,7 @@ function makeBook(id: number, overrides: Partial<BookCard> = {}): BookCard {
     coverAspectRatio: '2/3',
     title: `Book ${id}`,
     authors: [],
+    authorIds: [],
     seriesName: null,
     seriesIndex: null,
     files: [],
@@ -69,6 +70,7 @@ const collapsedSeriesBook = makeBook(1, {
   seriesId: 7,
   seriesName: 'Discworld',
   authors: ['Terry Pratchett'],
+  authorIds: [85],
   collapsedSeries: { bookCount: 3, readCount: 0, coverBookIds: [1], seriesLatestAddedAt: null },
 })
 const plainBook = makeBook(2)
@@ -126,6 +128,26 @@ describe('VirtualBookTable collapsed series rows', () => {
     expect(wrapper.emitted('select')?.[0]?.[0]).toBe(plainBook.id)
   })
 
+  it.each([{ shiftKey: true }, { ctrlKey: true }, { metaKey: true }])('preserves selection modifiers %o', async (modifiers) => {
+    const wrapper = mountTable()
+
+    await bodyRows(wrapper)[1]!.trigger('click', { button: 0, ...modifiers })
+
+    const selection = wrapper.emitted('select')?.[0]
+    expect(selection?.[0]).toBe(plainBook.id)
+    expect(selection?.[1]).toMatchObject(modifiers)
+  })
+
+  it('cancels auxiliary navigation without selecting a book in selection mode', () => {
+    const wrapper = mountTable()
+    const event = new MouseEvent('auxclick', { button: 1, bubbles: true, cancelable: true })
+
+    bodyRows(wrapper)[1]!.element.dispatchEvent(event)
+
+    expect(event.defaultPrevented).toBe(true)
+    expect(wrapper.emitted('select')).toBeUndefined()
+  })
+
   it('skips a collapsed series row when selecting with the keyboard', async () => {
     const wrapper = mountTable()
     const grid = wrapper.get('[tabindex="0"]')
@@ -144,9 +166,9 @@ describe('VirtualBookTable collapsed series rows', () => {
   it('gives a collapsed series row the author link used by book rows', () => {
     const wrapper = mountTable()
     const authorsCell = wrapper.findAllComponents({ name: 'BookTableCollapsedSeriesCell' }).find((cell) => cell.props('colId') === 'authors')
-    const linkFn = authorsCell?.props('linkFn') as ((chip: string) => string | null) | undefined
+    const linkFn = authorsCell?.props('linkFn') as ((chip: string, index: number) => string | null) | undefined
 
     expect(authorsCell?.props('book')).toMatchObject({ authors: ['Terry Pratchett'] })
-    expect(linkFn?.('Terry Pratchett')).toBe('/authors?q=Terry%20Pratchett')
+    expect(linkFn?.('Terry Pratchett', 0)).toBe('/authors/85')
   })
 })

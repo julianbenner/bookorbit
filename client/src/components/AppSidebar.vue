@@ -28,6 +28,7 @@ import CreateSmartScopeDialog from '@/features/smart-scope/components/CreateSmar
 import CreateCollectionDialog from '@/features/collection/components/CreateCollectionDialog.vue'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import SettingsSidebar from '@/features/settings/components/SettingsSidebar.vue'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -108,7 +109,8 @@ watch(openMobile, (open) => {
   if (!open && isMobile.value) stopCustomizing()
 })
 
-function handleNavigate() {
+function handleNavigate(event?: MouseEvent) {
+  if (event && !isPlainPrimaryClick(event)) return
   if (isMobile.value) setOpenMobile(false)
 }
 

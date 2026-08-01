@@ -582,7 +582,7 @@ describe('AuthorsService', () => {
     authorsRepo.findBookIdsPage.mockResolvedValue({ bookIds: [11], total: 1, page: 0, size: 50 });
     bookReadService.findCardsByBookIds.mockResolvedValue({
       rows: [{ ...makeBookRow(11, 'Enriched Book'), primaryFileId: 101 }],
-      authorRows: [{ bookId: 11, name: 'Author' }],
+      authorRows: [{ bookId: 11, authorId: 5, name: 'Author' }],
       fileRows: [{ bookId: 11, id: 101, format: 'epub', role: 'content', sizeBytes: 2048 }],
       genreRows: [{ bookId: 11, name: 'Fantasy' }],
       progressRows: [{ bookFileId: 101, percentage: 100 }],
@@ -617,6 +617,7 @@ describe('AuthorsService', () => {
     expect(result.items[0]).toMatchObject({
       id: 11,
       authors: ['Author'],
+      authorIds: [5],
       files: [{ id: 101, format: 'epub', role: 'primary', sizeBytes: 2048 }],
       genres: ['Fantasy'],
       readingProgress: 100,

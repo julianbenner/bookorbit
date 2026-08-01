@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { BookOpen, ExternalLink, Eye, Folder, FolderPlus, Headphones, Pencil, Star, Trash2, X } from '@lucide/vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
@@ -15,7 +15,7 @@ import { useCoverVersions } from '../composables/useCoverVersions'
 import BookFormatChip from './BookFormatChip.vue'
 import { bookFormatEntries, fileFormatKey } from '../lib/book-formats'
 import { displayPublishedDate } from '../lib/published-date'
-import { FORMAT_TO_GROUP, getPrimaryBookFile, isComicFormat } from '@bookorbit/types'
+import { FORMAT_TO_GROUP, getPrimaryBookFile, isComicFormat, type BookFileRef } from '@bookorbit/types'
 import { useBookCoverAspectRatio } from '../composables/useBookCoverAspectRatio'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -23,6 +23,7 @@ import { useSafeHtml } from '@/features/book/composables/useSafeHtml'
 import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverSurface from './BookCoverSurface.vue'
 import { useI18n } from 'vue-i18n'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 
 const { t } = useI18n()
 
@@ -35,7 +36,6 @@ const emit = defineEmits<{
   action: [type: 'add-to-collection' | 'delete']
 }>()
 
-const router = useRouter()
 const { detail, loading, fetch } = useBookDetail()
 
 const coverLoaded = ref(false)
@@ -127,34 +127,16 @@ function handleCoverClick() {
   if (coverLoaded.value && !coverFailed.value) coverLightboxOpen.value = true
 }
 
-function openBookWithMode(mode?: 'peek') {
-  if (!primaryFile.value || !detail.value) return
-  router.push({
+function readerRoute(file: BookFileRef, mode?: 'peek') {
+  return {
     name: 'reader',
-    params: { bookId: detail.value.id, fileId: primaryFile.value.id },
-    query: mode === 'peek' ? { format: primaryFile.value.format ?? 'epub', mode } : { format: primaryFile.value.format ?? 'epub' },
-  })
-  emit('update:open', false)
+    params: { bookId: detail.value!.id, fileId: file.id },
+    query: mode === 'peek' ? { format: file.format ?? 'epub', mode } : { format: file.format ?? 'epub' },
+  }
 }
 
-function openBook() {
-  openBookWithMode()
-}
-
-function peekBook() {
-  openBookWithMode('peek')
-}
-
-function editMetadata() {
-  if (!detail.value) return
-  router.push({ name: 'book-detail', params: { bookId: detail.value.id }, query: { tab: 'edit' } })
-  emit('update:open', false)
-}
-
-function openDetails() {
-  if (!detail.value) return
-  router.push({ name: 'book-detail', params: { bookId: detail.value.id } })
-  emit('update:open', false)
+function closeOnSameTabNavigation(event: MouseEvent) {
+  if (isPlainPrimaryClick(event)) emit('update:open', false)
 }
 
 function toggleGenres() {
@@ -390,31 +372,53 @@ function handleDelete() {
 
           <!-- Footer: actions -->
           <div class="p-4 border-t shrink-0 flex gap-2">
-            <button
-              class="flex flex-1 items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-              :disabled="!primaryFile"
+            <RouterLink
+              v-if="primaryFile && detail"
+              :to="readerRoute(primaryFile)"
+              class="flex flex-1 items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
               :aria-label="isPrimaryAudio ? t('book.actions.listen') : t('book.actions.read')"
-              @click="openBook"
+              @click="closeOnSameTabNavigation"
+            >
+              <Headphones v-if="isPrimaryAudio" class="size-4" />
+              <BookOpen v-else class="size-4" />
+              <span class="hidden sm:inline">{{ isPrimaryAudio ? t('book.actions.listen') : t('book.actions.read') }}</span>
+            </RouterLink>
+            <button
+              v-else
+              disabled
+              class="flex flex-1 items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium opacity-50"
+              :aria-label="isPrimaryAudio ? t('book.actions.listen') : t('book.actions.read')"
             >
               <Headphones v-if="isPrimaryAudio" class="size-4" />
               <BookOpen v-else class="size-4" />
               <span class="hidden sm:inline">{{ isPrimaryAudio ? t('book.actions.listen') : t('book.actions.read') }}</span>
             </button>
-            <button
+            <RouterLink
+              v-if="detail"
+              :to="{ name: 'book-detail', params: { bookId: detail.id } }"
               class="flex flex-1 items-center justify-center text-primary-foreground gap-2 h-9 rounded-md bg-sky-600 text-sm font-medium hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 transition-colors"
               :aria-label="t('book.actions.details')"
-              @click="openDetails"
+              @click="closeOnSameTabNavigation"
             >
               <ExternalLink class="size-4" />
               <span class="hidden sm:inline">{{ t('book.actions.details') }}</span>
-            </button>
+            </RouterLink>
             <Tooltip>
               <TooltipTrigger as-child>
-                <button
-                  class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors disabled:opacity-50"
-                  :disabled="!primaryFile"
+                <RouterLink
+                  v-if="primaryFile && detail"
+                  :to="readerRoute(primaryFile, 'peek')"
+                  class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
                   :aria-label="t('book.actions.peek')"
-                  @click="peekBook"
+                  @click="closeOnSameTabNavigation"
+                >
+                  <Eye class="size-3.5" />
+                </RouterLink>
+                <button
+                  v-else
+                  disabled
+                  class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm opacity-50"
+                  :aria-label="t('book.actions.peek')"
                 >
                   <Eye class="size-3.5" />
                 </button>
@@ -423,12 +427,15 @@ function handleDelete() {
             </Tooltip>
             <Tooltip v-if="canEditMetadata">
               <TooltipTrigger as-child>
-                <button
+                <RouterLink
+                  v-if="detail"
+                  :to="{ name: 'book-detail', params: { bookId: detail.id }, query: { tab: 'edit' } }"
                   class="flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-muted transition-colors"
-                  @click="editMetadata"
+                  :aria-label="t('book.quickView.openMetadataEditor')"
+                  @click="closeOnSameTabNavigation"
                 >
                   <Pencil class="size-3.5" />
-                </button>
+                </RouterLink>
               </TooltipTrigger>
               <TooltipContent>{{ t('book.quickView.openMetadataEditor') }}</TooltipContent>
             </Tooltip>

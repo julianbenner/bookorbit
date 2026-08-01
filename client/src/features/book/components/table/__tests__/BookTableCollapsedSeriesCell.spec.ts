@@ -19,7 +19,9 @@ function makeBook(format: string | null, overrides: Partial<BookCard> = {}): Boo
     coverAspectRatio: '2/3',
     title: 'Saga',
     authors: [],
+    authorIds: [],
     seriesName: 'Saga',
+    seriesId: 42,
     seriesIndex: null,
     files: format ? [{ id: 1, format, role: 'primary', sizeBytes: null }] : [],
     publishedDate: null,
@@ -112,14 +114,13 @@ describe('BookTableCollapsedSeriesCell comic flag', () => {
     expect(wrapper.get('[data-testid="tooltip-content"]').text()).toBe('Series row')
   })
 
-  it('offers a labeled button to open the series', async () => {
+  it('offers a labeled link to the series', () => {
     const wrapper = mountCell('epub', 'actions')
-    const button = wrapper.get('button')
+    const link = wrapper.getComponent(RouterLinkStub)
 
-    expect(button.attributes('aria-label')).toBe('Open series')
+    expect(link.attributes('aria-label')).toBe('Open series')
     expect(wrapper.get('[data-testid="tooltip-content"]').text()).toBe('Open series')
-    await button.trigger('click')
-    expect(wrapper.emitted('open-series')).toEqual([[]])
+    expect(link.props('to')).toEqual({ name: 'series-detail', params: { seriesId: 42 } })
   })
 
   it('links the series authors in the authors column', () => {

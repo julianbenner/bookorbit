@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { Check, ExternalLink, Loader2, MoreHorizontal, RefreshCw, Trash2 } from '@lucide/vue'
 import type { AuthorSummary, TableDensity } from '@bookorbit/types'
 import { formatNumber, formatRelativeFromNow } from '@/i18n/formatters'
@@ -11,6 +12,7 @@ import { hasInformativeSortName } from '../lib/author-identity'
 const props = withDefaults(
   defineProps<{
     author: AuthorSummary
+    to: RouteLocationRaw
     density?: TableDensity
     maxBookCount?: number
     selectionMode?: boolean
@@ -25,7 +27,6 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  open: [authorId: number]
   select: [event: MouseEvent]
   refresh: [authorId: number]
   delete: [authorId: number]
@@ -77,11 +78,7 @@ const busyLabel = computed(() =>
 )
 
 function handleActivate(event: MouseEvent) {
-  if (props.selectionMode || event.metaKey || event.ctrlKey || event.shiftKey) {
-    emit('select', event)
-    return
-  }
-  emit('open', props.author.id)
+  emit('select', event)
 }
 
 function handleRefresh() {
@@ -103,12 +100,19 @@ function handleDelete() {
     :style="{ minHeight: `${metrics.row}px` }"
   >
     <!-- Stretched primary action: keeps the whole row clickable without nesting the
-         menu button inside another button, which is invalid and breaks keyboard order. -->
+         menu button inside another link or button, which is invalid and breaks keyboard order. -->
+    <RouterLink
+      v-if="!selectionMode"
+      :to="to"
+      class="absolute inset-0 z-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+      :aria-label="accessibleLabel"
+    />
     <button
+      v-else
       type="button"
       class="absolute inset-0 z-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
       :aria-label="accessibleLabel"
-      :aria-pressed="selectionMode ? selected : undefined"
+      :aria-pressed="selected"
       @click="handleActivate"
     />
 
@@ -180,9 +184,11 @@ function handleDelete() {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem @click="emit('open', author.id)">
-          <ExternalLink class="mr-2 h-4 w-4" />
-          {{ t('author.card.viewDetails') }}
+        <DropdownMenuItem as-child>
+          <RouterLink :to="to">
+            <ExternalLink class="mr-2 h-4 w-4" />
+            {{ t('author.card.viewDetails') }}
+          </RouterLink>
         </DropdownMenuItem>
         <DropdownMenuItem :disabled="!canRefresh || refreshing" @click="handleRefresh">
           <Loader2 v-if="refreshing" class="mr-2 h-4 w-4 animate-spin" />

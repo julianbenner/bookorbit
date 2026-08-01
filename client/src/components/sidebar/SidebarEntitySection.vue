@@ -14,6 +14,7 @@ import { entityCount } from '@/lib/entity-count'
 import { useDraggableOrder } from '@/composables/useDraggableOrder'
 import { useSidebarPrefs } from '@/composables/useSidebarPrefs'
 import type { SidebarItemActivity } from '@/composables/useSidebarLibraryActivity'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 
 export interface SidebarEntity {
   id: number
@@ -145,6 +146,11 @@ function handleAdd() {
 }
 
 function handleNavigate() {
+  emit('navigate')
+}
+
+function handleSeeAllNavigate(event: MouseEvent) {
+  if (!isPlainPrimaryClick(event)) return
   emit('navigate')
 }
 
@@ -285,7 +291,7 @@ function onGripBlur(id: number) {
           v-if="showSeeAll && !isFiltering"
           :to="{ name: indexRouteName as string }"
           class="mt-0.5 flex h-8 items-center gap-1 rounded-md px-2 text-[13px] font-normal text-muted-foreground outline-hidden transition-colors duration-150 hover:bg-(--shell-accent-wash) hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-          @click="handleNavigate"
+          @click="handleSeeAllNavigate"
         >
           <span class="min-w-0 truncate">{{ seeAllLabel }}</span>
           <ArrowRight :size="13" aria-hidden="true" class="shrink-0" />

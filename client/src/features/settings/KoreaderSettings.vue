@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import {
   AlertTriangle,
@@ -91,6 +91,7 @@ if (route && router) {
     void router.replace({
       name: 'settings-koreader',
       query: { ...route.query, tab: activeTab.value },
+      hash: route.hash,
     })
   }
 
@@ -102,14 +103,8 @@ if (route && router) {
   )
 }
 
-function selectTab(tab: Tab): void {
-  activeTab.value = tab
-  if (route && router) {
-    void router.replace({
-      name: 'settings-koreader',
-      query: { ...route.query, tab },
-    })
-  }
+function tabTarget(tab: Tab): RouteLocationRaw {
+  return { name: 'settings-koreader', query: { ...route?.query, tab }, hash: route?.hash }
 }
 
 const {
@@ -867,7 +862,7 @@ async function handleDownloadPlugin() {
 </script>
 
 <template>
-  <SettingsTabs v-if="!props.embedded" id-prefix="koreader" :tabs="tabs" :active-tab="activeTab" @select="selectTab" />
+  <SettingsTabs v-if="!props.embedded" id-prefix="koreader" :tabs="tabs" :active-tab="activeTab" :tab-to="tabTarget" />
 
   <div
     id="koreader-sync-panel"

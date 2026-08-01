@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { reactive, nextTick } from 'vue'
 import type { SidebarCap, SidebarCappedSectionId, SidebarSectionId } from '@bookorbit/types'
 import SidebarEntitySection from '../SidebarEntitySection.vue'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 const sections = reactive<Record<SidebarSectionId, { open: boolean; cap?: SidebarCap }>>({
   reading: { open: true },
@@ -63,6 +64,8 @@ function makeItems(count: number) {
   }))
 }
 
+let router: Router
+
 function mountSection(itemCount: number, overrides: Record<string, unknown> = {}) {
   return mount(SidebarEntitySection, {
     props: {
@@ -82,8 +85,8 @@ function mountSection(itemCount: number, overrides: Record<string, unknown> = {}
       ...overrides,
     },
     global: {
+      plugins: [router],
       stubs: {
-        RouterLink: { name: 'RouterLink', props: ['to'], template: '<a><slot /></a>' },
         Transition: { name: 'Transition', template: '<slot />' },
       },
     },
@@ -95,7 +98,18 @@ function rowNames(wrapper: ReturnType<typeof mountSection>): string[] {
 }
 
 describe('SidebarEntitySection', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    const view = { template: '<div />' }
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: view },
+        { path: '/collections', name: 'collections', component: view },
+        { path: '/collections/:id', name: 'collection', component: view },
+      ],
+    })
+    await router.push('/')
+    await router.isReady()
     sections.collections.open = true
     sections.collections.cap = 8
   })
@@ -162,6 +176,24 @@ describe('SidebarEntitySection', () => {
       const wrapper = mountSection(8)
 
       expect(wrapper.text()).not.toContain('See all collections')
+    })
+
+    it('leaves the source section open on modified clicks and notifies it on plain navigation', async () => {
+      const wrapper = mountSection(9)
+      const link = wrapper.get('a[href="/collections"]')
+
+      await link.trigger('auxclick', { button: 1 })
+      for (const modifiers of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }]) {
+        await link.trigger('click', modifiers)
+      }
+      await flushPromises()
+      expect(wrapper.emitted('navigate')).toBeUndefined()
+      expect(router.currentRoute.value.fullPath).toBe('/')
+
+      await link.trigger('click')
+      await flushPromises()
+      expect(wrapper.emitted('navigate')).toEqual([[]])
+      expect(router.currentRoute.value.fullPath).toBe('/collections')
     })
 
     it('appears once the total exceeds the cap', () => {

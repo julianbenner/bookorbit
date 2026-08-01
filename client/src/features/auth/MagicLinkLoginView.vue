@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { CircleAlert, LoaderCircle } from '@lucide/vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import AuthAlert from './components/AuthAlert.vue'
@@ -36,10 +36,6 @@ onMounted(async () => {
     errorMessage.value = e instanceof Error ? e.message : t('auth.magicLink.loginFailed')
   }
 })
-
-function goToLogin() {
-  router.push('/login')
-}
 </script>
 
 <template>
@@ -51,13 +47,12 @@ function goToLogin() {
     <template v-else>
       <AuthAlert :icon="CircleAlert">{{ errorMessage }}</AuthAlert>
       <p class="mt-[1.375rem] text-center font-serif text-[0.9375rem]">
-        <button
-          type="button"
+        <RouterLink
+          to="/login"
           class="font-medium text-primary hover:underline focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          @click="goToLogin"
         >
           {{ t('auth.magicLink.goToLogin') }}
-        </button>
+        </RouterLink>
       </p>
     </template>
   </AuthPlate>

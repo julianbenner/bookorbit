@@ -99,6 +99,7 @@ function makeBook(id: number, format: string, coverAspectRatio: BookCard['coverA
     coverAspectRatio,
     title: `Book ${id}`,
     authors: [],
+    authorIds: [],
     seriesName: null,
     seriesIndex: null,
     files: [{ id, format, role: 'primary', sizeBytes: 123 }],

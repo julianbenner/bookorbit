@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Wrench } from '@lucide/vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const route = useRoute()
-const router = useRouter()
 const { t } = useI18n()
 const { hasPermission } = usePermissions()
 
@@ -37,10 +36,6 @@ const sections = computed<ToolSection[]>(() => {
 
   return result
 })
-
-function navigateToSection(section: ToolSection): void {
-  router.push({ name: section.routeName })
-}
 </script>
 
 <template>
@@ -50,14 +45,15 @@ function navigateToSection(section: ToolSection): void {
       <Wrench :size="16" class="text-primary" aria-hidden="true" />
       <span class="text-sm font-semibold text-foreground">{{ t('components.sidebar.tools') }}</span>
     </div>
-    <button
+    <RouterLink
       v-for="section in sections"
       :key="section.routeName"
-      class="px-3 h-full text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 snap-start"
+      :to="{ name: section.routeName }"
+      :aria-current="route.name === section.routeName ? 'page' : undefined"
+      class="inline-flex items-center px-3 h-full text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 snap-start"
       :class="route.name === section.routeName ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-      @click="navigateToSection(section)"
     >
       {{ section.label }}
-    </button>
+    </RouterLink>
   </div>
 </template>

@@ -1,5 +1,5 @@
 import { ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 
 interface UseRouteTabOptions<T extends string> {
   routeName?: string
@@ -11,6 +11,7 @@ interface UseRouteTabOptions<T extends string> {
 interface UseRouteTabResult<T extends string> {
   activeTab: Ref<T>
   selectTab: (tab: T) => void
+  tabTarget: (tab: T) => RouteLocationRaw
 }
 
 export function useRouteTab<T extends string>(options: UseRouteTabOptions<T>): UseRouteTabResult<T> {
@@ -28,8 +29,7 @@ export function useRouteTab<T extends string>(options: UseRouteTabOptions<T>): U
 
   function replaceQuery(tab: T): void {
     if (route.query.tab === tab) return
-    const query = { ...route.query, tab }
-    void router.replace(options.routeName ? { name: options.routeName, query } : { query })
+    void router.replace(tabTarget(tab))
   }
 
   function syncTab(value: unknown): void {
@@ -50,5 +50,10 @@ export function useRouteTab<T extends string>(options: UseRouteTabOptions<T>): U
     replaceQuery(tab)
   }
 
-  return { activeTab, selectTab }
+  function tabTarget(tab: T): RouteLocationRaw {
+    const query = { ...route.query, tab }
+    return options.routeName ? { name: options.routeName, query, hash: route.hash } : { query, hash: route.hash }
+  }
+
+  return { activeTab, selectTab, tabTarget }
 }

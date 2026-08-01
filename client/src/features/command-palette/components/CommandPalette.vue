@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter, type RouteLocationRaw } from 'vue-router'
+import { RouterLink, useRouter, type RouteLocationRaw } from 'vue-router'
 import { DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
 import { ArrowLeft, ArrowRight, Loader2, Search, X } from '@lucide/vue'
 import AppIcon from '@/components/AppIcon.vue'
@@ -11,6 +11,7 @@ import BookFormatChip from '@/features/book/components/BookFormatChip.vue'
 import { bookFormatEntries } from '@/features/book/lib/book-formats'
 import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
 import { formatNumber, formatPercent } from '@/i18n/formatters'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 import { useCommandPalette } from '../composables/useCommandPalette'
 import { useCommandPaletteResults, type PaletteItem, type PaletteTab } from '../composables/useCommandPaletteResults'
 import { highlightSegments } from '../lib/highlight'
@@ -87,31 +88,45 @@ function handleOpenAutoFocus(event: Event) {
   inputRef.value?.focus()
 }
 
-function select(item: PaletteItem) {
+/** Where a row leads, so it renders as a real link; actions and "more" rows stay inside the palette. */
+function itemRoute(item: PaletteItem): RouteLocationRaw | null {
   switch (item.kind) {
     case 'book':
     case 'reading':
-      navigate({ name: 'book-detail', params: { bookId: item.book.id } })
-      return
+      return { name: 'book-detail', params: { bookId: item.book.id } }
     case 'author':
-      navigate({ name: 'author-detail', params: { id: item.author.id } })
-      return
+      return { name: 'author-detail', params: { id: item.author.id } }
     case 'series':
-      navigate({ name: 'series-detail', params: { seriesId: item.series.id } })
-      return
+      return { name: 'series-detail', params: { seriesId: item.series.id } }
     case 'place':
     case 'setting':
-      navigate(item.to)
-      return
-    case 'action':
-      closePalette()
-      item.run()
-      return
-    case 'more':
-      tab.value = item.tab
-      listRef.value?.scrollTo({ top: 0 })
-      inputRef.value?.focus()
+      return item.to
+    default:
+      return null
   }
+}
+
+function select(item: PaletteItem) {
+  const to = itemRoute(item)
+  if (to) {
+    navigate(to)
+  } else if (item.kind === 'action') {
+    closePalette()
+    item.run()
+  } else if (item.kind === 'more') {
+    tab.value = item.tab
+    listRef.value?.scrollTo({ top: 0 })
+    inputRef.value?.focus()
+  }
+}
+
+/** A link row navigates by itself; a modified click opens it elsewhere and keeps the palette and its results. */
+function handleItemClick(event: MouseEvent, item: PaletteItem) {
+  if (!itemRoute(item)) {
+    select(item)
+    return
+  }
+  if (isPlainPrimaryClick(event)) closePalette()
 }
 
 function selectTab(next: PaletteTab) {
@@ -286,16 +301,18 @@ const highlightClass = 'rounded-[2px] bg-(--shell-accent-tint) font-semibold tex
               <span v-if="section.count != null" class="text-xs text-muted-foreground tabular-nums">{{ formatNumber(section.count) }}</span>
             </div>
 
-            <div
+            <component
+              :is="itemRoute(item) ? RouterLink : 'div'"
               v-for="item in section.items"
               :id="optionId(indexOf(item))"
               :key="item.key"
+              :to="itemRoute(item) ?? undefined"
               role="option"
               :aria-selected="indexOf(item) === activeIndex"
               class="flex w-full cursor-pointer items-center gap-3 rounded-md px-2.5 text-start"
               :class="[indexOf(item) === activeIndex ? 'bg-accent' : '', rowSizeClass(item)]"
               @mousemove="hover(item)"
-              @click="select(item)"
+              @click="handleItemClick($event, item)"
             >
               <template v-if="item.kind === 'book' || item.kind === 'reading'">
                 <BookCoverImage
@@ -432,7 +449,7 @@ const highlightClass = 'rounded-[2px] bg-(--shell-accent-tint) font-semibold tex
                   <ArrowRight :size="14" class="rtl:rotate-180" aria-hidden="true" />
                 </span>
               </template>
-            </div>
+            </component>
           </div>
 
           <p v-if="tab === 'books' && loadingMoreBooks" class="px-3 py-3 text-center text-[13px] text-muted-foreground">

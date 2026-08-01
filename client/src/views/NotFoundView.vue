@@ -1,14 +1,9 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { House } from '@lucide/vue'
 
 const { t } = useI18n()
-const router = useRouter()
-
-function goHome() {
-  router.push('/')
-}
 </script>
 
 <template>
@@ -23,13 +18,13 @@ function goHome() {
       <h1 class="text-xl font-semibold text-foreground">{{ t('views.notFound.title') }}</h1>
       <p class="text-sm text-muted-foreground">{{ t('views.notFound.description') }}</p>
     </div>
-    <button
+    <RouterLink
+      to="/"
       class="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors mt-2 animate-fade-up"
       style="animation-delay: 300ms"
-      @click="goHome"
     >
       <House :size="15" />
       {{ t('views.notFound.goHome') }}
-    </button>
+    </RouterLink>
   </div>
 </template>

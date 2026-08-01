@@ -1,5 +1,5 @@
-import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import type { CurrentlyReadingWidgetData } from '@bookorbit/types'
 import CurrentlyReadingWidget from '../CurrentlyReadingWidget.vue'
 
@@ -8,7 +8,6 @@ const fetchCurrentlyReading = vi.fn<() => Promise<CurrentlyReadingWidgetData>>()
 vi.mock('@/features/dashboard/api/dashboard-widget.api', () => ({
   fetchCurrentlyReading: () => fetchCurrentlyReading(),
 }))
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn<(...args: unknown[]) => void>() }) }))
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
   useCoverVersions: () => ({ coverUrl: () => '/cover.jpg' }),
 }))
@@ -43,7 +42,13 @@ function book(fileFormat: string | null) {
 function mountWidget(fileFormat: string | null) {
   fetchCurrentlyReading.mockResolvedValue({ books: [book(fileFormat)] })
   return mount(CurrentlyReadingWidget, {
-    global: { stubs: { BookCoverSurface: CoverSurfaceStub, BookCoverArtwork: CoverArtworkStub } },
+    global: {
+      stubs: {
+        BookCoverSurface: CoverSurfaceStub,
+        BookCoverArtwork: CoverArtworkStub,
+        RouterLink: { template: '<a><slot /></a>' },
+      },
+    },
   })
 }
 

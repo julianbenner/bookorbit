@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import { ChevronRight, LibraryBig } from '@lucide/vue'
 import { FORMAT_TO_GROUP, isComicFormat, type BookCard } from '@bookorbit/types'
 import BookCoverSurface from '../BookCoverSurface.vue'
@@ -11,11 +12,7 @@ import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 const props = defineProps<{
   book: BookCard
   colId: string
-  linkFn?: (chip: string) => string | null
-}>()
-
-const emit = defineEmits<{
-  'open-series': []
+  linkFn?: (chip: string, index: number) => string | null
 }>()
 
 const { t } = useI18n()
@@ -30,13 +27,11 @@ const isAudiobook = computed(() => primaryFile.value?.format != null && FORMAT_T
 const isComic = computed(() => primaryFile.value?.format != null && isComicFormat(primaryFile.value.format))
 const { coverUrl } = useCoverVersions()
 
+const seriesLink = computed(() => (props.book.seriesId == null ? null : { name: 'series-detail', params: { seriesId: props.book.seriesId } }))
+
 function thumbnailUrl(bookId: number): string {
   const version = bookId === props.book.id ? props.book.coverVersion : collapsed.value.coverUpdatedAtByBookId?.[bookId]
   return coverUrl(bookId, 'thumbnail', version)
-}
-
-function handleOpenSeries() {
-  emit('open-series')
 }
 </script>
 
@@ -66,7 +61,13 @@ function handleOpenSeries() {
 
   <div v-else-if="colId === 'cover'" class="flex h-9 items-center">
     <!-- Cover row: up to 4 thumbnails -->
-    <div class="flex shrink-0 gap-0.5 min-w-9" :class="coverIds.length <= 1 ? 'justify-center' : 'justify-start'">
+    <RouterLink
+      v-if="seriesLink"
+      :to="seriesLink"
+      :aria-label="t('book.tableView.openSeries')"
+      class="flex shrink-0 gap-0.5 min-w-9 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      :class="coverIds.length <= 1 ? 'justify-center' : 'justify-start'"
+    >
       <BookCoverSurface
         v-for="coverId in coverIds"
         :key="coverId"
@@ -86,9 +87,20 @@ function handleOpenSeries() {
       >
         <span class="text-[8px] text-muted-foreground">?</span>
       </BookCoverSurface>
-    </div>
+    </RouterLink>
   </div>
 
+  <RouterLink
+    v-else-if="colId === 'title' && seriesLink"
+    :to="seriesLink"
+    class="flex items-center gap-2 min-w-0 h-full rounded px-1 hover:bg-primary/5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+  >
+    <span class="font-medium text-sm truncate block">{{ seriesName }}</span>
+    <span class="text-xs text-muted-foreground shrink-0 mt-0.5">{{ t('book.table.series.bookCount', { count: bookCount }) }}</span>
+    <span v-if="readCount > 0" class="text-xs text-muted-foreground shrink-0 mt-0.5"
+      >&middot; {{ t('book.table.series.readOfCount', { read: readCount, total: bookCount }) }}</span
+    >
+  </RouterLink>
   <div v-else-if="colId === 'title'" class="flex items-center gap-2 min-w-0 h-full px-1">
     <span class="font-medium text-sm truncate block">{{ seriesName }}</span>
     <span class="text-xs text-muted-foreground shrink-0 mt-0.5">{{ t('book.table.series.bookCount', { count: bookCount }) }}</span>
@@ -99,17 +111,16 @@ function handleOpenSeries() {
 
   <BookTableChipsCell v-else-if="colId === 'authors'" :value="book.authors" :is-active="false" is-read-only :link-fn="linkFn" />
 
-  <div v-else-if="colId === 'actions'" class="flex h-full w-6 items-center justify-center">
+  <div v-else-if="colId === 'actions' && seriesLink" class="flex h-full w-6 items-center justify-center">
     <Tooltip>
       <TooltipTrigger as-child>
-        <button
-          type="button"
+        <RouterLink
+          :to="seriesLink"
           :aria-label="t('book.tableView.openSeries')"
           class="flex h-7 w-7 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          @click.stop="handleOpenSeries"
         >
           <ChevronRight :size="16" aria-hidden="true" />
-        </button>
+        </RouterLink>
       </TooltipTrigger>
       <TooltipContent>{{ t('book.tableView.openSeries') }}</TooltipContent>
     </Tooltip>

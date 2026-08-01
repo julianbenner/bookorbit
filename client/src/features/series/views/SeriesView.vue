@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import { ChevronDown, Library, Rows3, X } from '@lucide/vue'
 
 import BrowseHeader from '@/components/browse-header/BrowseHeader.vue'
@@ -160,8 +160,8 @@ function syncRouteQuery() {
   })
 }
 
-function openSeries(seriesId: number) {
-  void router.push({ name: 'series-detail', params: { seriesId }, query: { from: route.fullPath } })
+function seriesDetailTo(seriesId: number): RouteLocationRaw {
+  return { name: 'series-detail', params: { seriesId }, query: { from: route.fullPath } }
 }
 
 function setSortField(field: SeriesListSort) {
@@ -466,7 +466,7 @@ defineOptions({ name: 'SeriesView' })
               <span class="h-px flex-1 bg-border" />
             </div>
             <div class="series-grid grid" :style="{ '--series-card-width': `${cardWidth}px`, gap: `${gridGap}px` }">
-              <SeriesGridCard v-for="series in group.items" :key="series.id" :series="series" @open="openSeries" />
+              <SeriesGridCard v-for="series in group.items" :key="series.id" :series="series" :to="seriesDetailTo(series.id)" />
             </div>
           </template>
         </div>
@@ -478,7 +478,7 @@ defineOptions({ name: 'SeriesView' })
           :order="order"
           :row-height="LIST_ROW_HEIGHT"
           :header-offset="0"
-          @open="openSeries"
+          :series-to="seriesDetailTo"
           @sort="setSortField"
         />
       </template>

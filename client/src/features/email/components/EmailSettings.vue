@@ -55,7 +55,7 @@ const tabs = computed<{ id: EmailTab; label: string; count?: number }[]>(() => {
   ]
 })
 const tabIds = computed(() => tabs.value.map((tab) => tab.id))
-const { activeTab, selectTab } = useRouteTab<EmailTab>({
+const { activeTab, selectTab, tabTarget } = useRouteTab<EmailTab>({
   routeName: 'settings-email',
   normalize: normalizeEmailTab,
   availableTabs: tabIds,
@@ -275,7 +275,7 @@ const previewBooks = computed<PreviewBook[]>(() => {
   <template v-else>
     <EmailAttentionBand v-if="showAttention" class="mb-5" :items="attentionItems" :busy-id="busyAttention" @act="actOnAttention" />
 
-    <SettingsTabs :tabs="tabs" :active-tab="activeTab" @select="selectTab" />
+    <SettingsTabs :tabs="tabs" :active-tab="activeTab" :tab-to="tabTarget" />
 
     <EmailRecipientsTab
       v-if="activeTab === 'recipients'"
