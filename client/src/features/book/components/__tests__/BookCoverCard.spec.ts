@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import BookCoverCard from '../BookCoverCard.vue'
 import type { BookCard } from '@bookorbit/types'
-import { nextTick, ref } from 'vue'
+import { nextTick, ref, defineComponent } from 'vue'
 import { COVER_ASPECT_RATIO_KEY } from '@/features/book/lib/cover-aspect-ratio'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
@@ -11,6 +11,17 @@ const routerPushMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>()
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()
   return { ...actual, useRoute: () => ({ fullPath: '/' }), useRouter: () => ({ push: routerPushMock }) }
+})
+
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: {
+    to: {
+      type: [String, Object],
+      required: true,
+    },
+  },
+  template: '<a><slot /></a>',
 })
 vi.mock('@/features/author/api/author', () => ({
   fetchAuthors: vi.fn<(...args: unknown[]) => unknown>(),
@@ -25,8 +36,6 @@ vi.mock('@/features/book/lib/book-cover', () => ({
     from: 'oklch(0.22 0.07 200)',
     to: 'oklch(0.28 0.05 220)',
     color: 'oklch(0.99 0.025 200)',
-    accent: 'oklch(0.82 0.16 200)',
-    textMuted: 'oklch(0.92 0.08 200)',
   }),
   titleFontSizeClass: () => 'text-[11cqi]',
 }))
@@ -37,6 +46,7 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
 // Stub complex UI sub-components
 const globalStubs = {
   stubs: {
+    RouterLink: RouterLinkStub,
     DropdownMenu: { template: '<div><slot /></div>' },
     DropdownMenuContent: { template: '<div><slot /></div>' },
     DropdownMenuItem: { template: '<div><slot /></div>' },
@@ -198,44 +208,43 @@ describe('BookCoverCard — cover aspect override', () => {
 })
 
 describe('BookCoverCard — present state', () => {
-  it('opens the reader on desktop card click by default', async () => {
+  it('renders the reader link on the card by default', () => {
     const wrapper = mountCard(presentBook)
+    const routes = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'))
 
-    await wrapper.find('.group').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'reader', params: { bookId: 2, fileId: 10 } }))
+    expect(routes).toContainEqual({
+      name: 'reader',
+      params: { bookId: 2, fileId: 10 },
+      query: { format: 'epub' },
+    })
   })
 
-  it('opens book details on desktop card click when thumbnail clicks prefer details', async () => {
+  it('renders the book detail link when thumbnail clicks prefer details', () => {
     thumbnailClickAction.value = 'details'
     const wrapper = mountCard(presentBook)
+    const routes = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'))
 
-    await wrapper.find('.group').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 2 } })
-    expect(routerPushMock).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
+    expect(routes).toContainEqual({ name: 'book-detail', params: { bookId: 2 } })
+    expect(routes).toContainEqual(expect.objectContaining({ name: 'reader' }))
   })
 
-  it('opens book details from the primary overlay action when thumbnail clicks prefer details', async () => {
+  it('uses the same book detail route for the primary overlay action', () => {
     thumbnailClickAction.value = 'details'
     const wrapper = mountCard(presentBook)
+    const action = wrapper.findComponent(RouterLinkStub)
 
-    await wrapper.get('[data-testid="grid-card-primary-action"]').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 2 } })
-    expect(routerPushMock).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
+    expect(action.props('to')).toEqual({ name: 'book-detail', params: { bookId: 2 } })
   })
 
-  it('opens book details for missing books when thumbnail clicks prefer details', async () => {
+  it('renders book details for missing books when details are preferred', () => {
     thumbnailClickAction.value = 'details'
     const wrapper = mountCard(missingBook)
+    const routes = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'))
 
-    await wrapper.find('.group').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 1 } })
+    expect(routes).toContainEqual({ name: 'book-detail', params: { bookId: 1 } })
   })
 
-  it('selects instead of navigating in selection mode', async () => {
+  it('selects instead of rendering navigation links in selection mode', async () => {
     thumbnailClickAction.value = 'details'
     const wrapper = mount(BookCoverCard, {
       props: { book: presentBook, selectionMode: true },
@@ -250,6 +259,7 @@ describe('BookCoverCard — present state', () => {
     await wrapper.find('.group').trigger('click')
 
     expect(wrapper.emitted('select')).toHaveLength(1)
+    expect(wrapper.findAllComponents(RouterLinkStub)).toHaveLength(0)
     expect(routerPushMock).not.toHaveBeenCalled()
   })
 

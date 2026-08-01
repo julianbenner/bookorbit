@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
 import type { AuthorSummary } from '@bookorbit/types'
@@ -12,16 +13,15 @@ const props = defineProps<{
   author: AuthorSummary
   selectionMode?: boolean
   selected?: boolean
+  to: RouteLocationRaw
   canRefresh?: boolean
   canDelete?: boolean
   refreshing?: boolean
   deleting?: boolean
   shape?: 'square' | 'circle'
 }>()
-
 const emit = defineEmits<{
-  open: [authorId: number]
-  select: [event: MouseEvent]
+  select: [event: MouseEvent | KeyboardEvent]
   refresh: [authorId: number]
   delete: [authorId: number]
 }>()
@@ -44,12 +44,12 @@ watch(
   },
 )
 
-function handleClick(event: MouseEvent) {
-  if (props.selectionMode || event.metaKey || event.ctrlKey) {
-    emit('select', event)
-    return
-  }
-  emit('open', props.author.id)
+function handleSelectionClick(event: MouseEvent) {
+  if (props.selectionMode) emit('select', event)
+}
+
+function handleSelectionKeydown(event: KeyboardEvent) {
+  if (props.selectionMode) emit('select', event)
 }
 
 function handleRefresh() {
@@ -67,10 +67,15 @@ function handleDelete() {
   <!-- Square layout (default) -->
   <div
     v-if="shape !== 'circle'"
-    class="group flex flex-col @container"
-    :class="[selectionMode ? 'select-none' : '', 'cursor-pointer']"
-    @click="handleClick($event as MouseEvent)"
+    class="group relative flex flex-col @container"
+    :class="[selectionMode ? 'cursor-pointer select-none' : 'cursor-pointer']"
+    :role="selectionMode ? 'button' : undefined"
+    :tabindex="selectionMode ? 0 : undefined"
+    :aria-pressed="selectionMode ? selected : undefined"
+    @click="handleSelectionClick"
+    @keydown.enter.space.prevent="handleSelectionKeydown"
   >
+    <RouterLink v-if="!selectionMode" :to="to" :aria-label="t('author.card.viewDetails', { name: author.name })" class="absolute inset-0 z-0" />
     <div
       class="relative w-full rounded-sm overflow-hidden shadow-md transition-[box-shadow,transform,ring] duration-150 will-change-transform"
       :class="[selectionMode ? '' : 'group-hover:shadow-xl group-hover:scale-[1.02]', selected ? 'ring-2 ring-primary' : '']"
@@ -128,9 +133,11 @@ function handleDelete() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem @click="emit('open', author.id)">
-                <ExternalLink class="mr-2 h-4 w-4" />
-                {{ t('author.card.viewDetails') }}
+              <DropdownMenuItem as-child>
+                <RouterLink :to="to">
+                  <ExternalLink class="mr-2 h-4 w-4" />
+                  {{ t('author.card.viewDetails') }}
+                </RouterLink>
               </DropdownMenuItem>
               <DropdownMenuItem :disabled="!canRefresh || refreshing" @click="handleRefresh">
                 <Loader2 v-if="refreshing" class="mr-2 h-4 w-4 animate-spin" />
@@ -162,10 +169,15 @@ function handleDelete() {
   <!-- Circle layout -->
   <div
     v-else
-    class="group flex flex-col items-center gap-2 py-2 @container"
-    :class="[selectionMode ? 'select-none' : '', 'cursor-pointer']"
-    @click="handleClick($event as MouseEvent)"
+    class="group relative flex flex-col items-center gap-2 py-2 @container"
+    :class="[selectionMode ? 'cursor-pointer select-none' : 'cursor-pointer']"
+    :role="selectionMode ? 'button' : undefined"
+    :tabindex="selectionMode ? 0 : undefined"
+    :aria-pressed="selectionMode ? selected : undefined"
+    @click="handleSelectionClick"
+    @keydown.enter.space.prevent="handleSelectionKeydown"
   >
+    <RouterLink v-if="!selectionMode" :to="to" :aria-label="t('author.card.viewDetails', { name: author.name })" class="absolute inset-0 z-0" />
     <div class="relative w-full aspect-square">
       <div
         class="w-full h-full rounded-full overflow-hidden shadow-md transition-[box-shadow,transform,ring] duration-150 will-change-transform"
@@ -224,9 +236,11 @@ function handleDelete() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem @click="emit('open', author.id)">
-            <ExternalLink class="mr-2 h-4 w-4" />
-            {{ t('author.card.viewDetails') }}
+          <DropdownMenuItem as-child>
+            <RouterLink :to="to">
+              <ExternalLink class="mr-2 h-4 w-4" />
+              {{ t('author.card.viewDetails') }}
+            </RouterLink>
           </DropdownMenuItem>
           <DropdownMenuItem :disabled="!canRefresh || refreshing" @click="handleRefresh">
             <Loader2 v-if="refreshing" class="mr-2 h-4 w-4 animate-spin" />

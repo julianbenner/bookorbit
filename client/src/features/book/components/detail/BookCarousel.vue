@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { ChevronLeft, ChevronRight } from '@lucide/vue'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
@@ -35,7 +34,6 @@ const props = withDefaults(
   },
 )
 
-const router = useRouter()
 const { coverUrl } = useCoverVersions()
 const scrollEl = ref<HTMLElement | null>(null)
 const coverResetVersion = ref(0)
@@ -43,10 +41,6 @@ const coverResetVersion = ref(0)
 function scroll(direction: 'left' | 'right') {
   if (!scrollEl.value) return
   scrollEl.value.scrollBy({ left: direction === 'left' ? -240 : 240, behavior: 'smooth' })
-}
-
-function navigateToBook(bookId: number) {
-  router.push({ name: 'book-detail', params: { bookId } })
 }
 
 function formatSeriesIndex(index: number | null | undefined): string {
@@ -115,14 +109,14 @@ defineExpose({ scroll })
     </div>
 
     <div v-else ref="scrollEl" class="flex gap-6 overflow-x-auto pb-2">
-      <button
+      <RouterLink
         v-for="(book, index) in books"
         :key="book.id"
+        :to="{ name: 'book-detail', params: { bookId: book.id } }"
         :data-book-id="book.id"
         class="shrink-0 text-left group animate-fade-up"
         :class="book.coverAspectRatio === '1/1' ? 'w-38' : 'w-30'"
         :style="{ animationDelay: `${index * 40}ms` }"
-        @click="navigateToBook(book.id)"
       >
         <BookCoverSurface
           class="book-cover-surface--spine-fitted relative w-full rounded-sm overflow-hidden transition-transform duration-150 group-hover:scale-[1.02]"
@@ -153,7 +147,7 @@ defineExpose({ scroll })
             {{ formatSeriesIndex(book.seriesIndex) }}
           </span>
         </BookCoverSurface>
-      </button>
+      </RouterLink>
     </div>
   </div>
 </template>

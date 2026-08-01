@@ -12,6 +12,11 @@ const routerState = {
 }
 
 vi.mock('vue-router', () => ({
+  RouterLink: {
+    name: 'RouterLink',
+    props: { to: { type: [String, Object, Array], required: true }, replace: Boolean },
+    template: '<a><slot /></a>',
+  },
   useRoute: () => ({ query: routerState.currentQuery }),
   useRouter: () => ({
     replace: vi.fn<(to: { name: string; query: Record<string, string> }) => void>((to) => {
@@ -47,7 +52,7 @@ describe('AccountAllSettings', () => {
   describe('non-demo user', () => {
     it('sees Profile, Privacy, and Notifications tabs', () => {
       const wrapper = mountComponent()
-      const labels = wrapper.findAll('button').map((b) => b.text())
+      const labels = wrapper.findAll('a').map((link) => link.text())
       expect(labels).toContain('Profile')
       expect(labels).toContain('Privacy & Sharing')
       expect(labels).toContain('Notifications')
@@ -90,7 +95,7 @@ describe('AccountAllSettings', () => {
   describe('demo-restricted user', () => {
     it('keeps Privacy available while hiding Notifications', () => {
       const wrapper = mountComponent(undefined, true)
-      const labels = wrapper.findAll('button').map((b) => b.text())
+      const labels = wrapper.findAll('a').map((link) => link.text())
       expect(labels).toContain('Profile')
       expect(labels).toContain('Privacy & Sharing')
       expect(labels).not.toContain('Notifications')
@@ -109,39 +114,25 @@ describe('AccountAllSettings', () => {
   })
 
   describe('tab navigation', () => {
-    it('active tab button has border-primary class', () => {
+    it('active tab link has border-primary class', () => {
       const wrapper = mountComponent('profile')
-      const profileBtn = wrapper.findAll('button').find((b) => b.text() === 'Profile')
-      expect(profileBtn?.classes()).toContain('border-primary')
+      const profileLink = wrapper.findAll('a').find((link) => link.text() === 'Profile')
+      expect(profileLink?.classes()).toContain('border-primary')
     })
 
-    it('inactive tab button has border-transparent class', () => {
+    it('inactive tab link has border-transparent class', () => {
       const wrapper = mountComponent('profile')
-      const notifBtn = wrapper.findAll('button').find((b) => b.text() === 'Notifications')
-      expect(notifBtn?.classes()).toContain('border-transparent')
+      const notifLink = wrapper.findAll('a').find((link) => link.text() === 'Notifications')
+      expect(notifLink?.classes()).toContain('border-transparent')
     })
 
-    it('clicking Notifications tab switches to NotificationPreferences', async () => {
-      permState.isDemo = false
-      routerState.currentQuery = { tab: 'profile' }
-      const wrapper = mount(AccountAllSettings)
+    it('renders the notifications tab route target', () => {
+      const wrapper = mountComponent('profile')
+      const link = wrapper.findAllComponents({ name: 'RouterLink' }).find((item) => item.text() === 'Notifications')
 
-      const notifBtn = wrapper.findAll('button').find((b) => b.text() === 'Notifications')
-      await notifBtn!.trigger('click')
-
-      expect(wrapper.find('[data-testid="notification-preferences"]').exists()).toBe(true)
-    })
-
-    it('clicking a tab calls router.replace with the correct tab', async () => {
-      permState.isDemo = false
-      routerState.currentQuery = { tab: 'profile' }
-      routerState.replacedQuery = null
-      const wrapper = mount(AccountAllSettings)
-
-      const notifBtn = wrapper.findAll('button').find((b) => b.text() === 'Notifications')
-      await notifBtn!.trigger('click')
-
-      expect(routerState.replacedQuery!['tab']).toBe('notifications')
+      expect(link).toBeDefined()
+      expect(link?.props('to')).toEqual({ name: 'settings-account', query: { tab: 'notifications' } })
+      expect(link?.props('replace')).toBe(true)
     })
 
     it('does not replace URL when tab param already set', () => {

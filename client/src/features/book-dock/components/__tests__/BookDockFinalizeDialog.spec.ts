@@ -1,6 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { defineComponent, ref } from 'vue'
 import type { BookDockFinalizeResult } from '@bookorbit/types'
 import BookDockFinalizeDialog from '../BookDockFinalizeDialog.vue'
 
@@ -13,11 +13,16 @@ const resetMock = vi.fn<() => void>()
 const fetchLibrariesMock = vi.fn<() => Promise<void>>()
 const refreshLibrariesMock = vi.fn<() => void>()
 
-vi.mock('vue-router', () => ({
-  useRouter: () => ({
-    push: vi.fn<(...args: unknown[]) => void>(),
-  }),
-}))
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: {
+    to: {
+      type: [String, Object],
+      required: true,
+    },
+  },
+  template: '<a><slot /></a>',
+})
 
 vi.mock('@/lib/api', () => ({
   api: (...args: unknown[]) => apiMock(...args),
@@ -58,6 +63,7 @@ function mountDialog() {
     global: {
       stubs: {
         Teleport: true,
+        RouterLink: RouterLinkStub,
       },
     },
   })
@@ -176,5 +182,14 @@ describe('BookDockFinalizeDialog', () => {
     expect(wrapper.text()).toContain('Import')
     expect(wrapper.text()).not.toContain('Import anyway')
     expect(wrapper.find('input[type="text"]').exists()).toBe(true)
+    const existingLink = wrapper.getComponent(RouterLinkStub)
+    expect(existingLink.props('to')).toEqual({ name: 'book-detail', params: { bookId: 42 } })
+
+    await existingLink.trigger('click', { button: 1 })
+    await existingLink.trigger('click', { ctrlKey: true })
+    await existingLink.trigger('click', { metaKey: true })
+
+    expect(wrapper.emitted('close')).toBeUndefined()
+    expect(wrapper.emitted('finalized')).toBeUndefined()
   })
 })

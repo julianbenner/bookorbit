@@ -1,22 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { ArrowUpRight, ChartPie, Clock3, Eye, EyeOff, Search, ShieldCheck, UserRoundCheck, UserRoundX, UsersRound } from '@lucide/vue'
-import type {
-  AccountActivityListItem,
-  AccountActivitySortDirection,
-  AccountActivitySortField,
-  AccountActivityState,
-  ReadingInsightsSharingLevel,
-} from '@bookorbit/types'
+import type { AccountActivitySortDirection, AccountActivitySortField, AccountActivityState, ReadingInsightsSharingLevel } from '@bookorbit/types'
 
 import { formatDate, formatDateTime, formatNumber, formatRelativeTime } from '@/i18n/formatters'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAccountActivity } from './composables/useAccountActivity'
 
 const { t } = useI18n()
-const router = useRouter()
 const activity = useAccountActivity()
 type SortSelection = 'lastAuthenticatedAt:desc' | 'lastAuthenticatedAt:asc' | 'lastLoginAt:desc' | 'createdAt:desc' | 'createdAt:asc' | 'name:asc'
 
@@ -75,10 +68,6 @@ function handleNextPage() {
   if (activity.page.value >= activity.totalPages.value) return
   activity.page.value++
   void activity.load()
-}
-
-function openSharedInsights(item: AccountActivityListItem) {
-  router.push({ name: 'settings-admin-shared-insights', params: { userId: item.id } })
 }
 
 function relativeTimestamp(value: string | null): string {
@@ -279,18 +268,17 @@ function sharingIcon(level: ReadingInsightsSharingLevel) {
                 {{ compactDate(item.createdAt) }}
               </td>
               <td class="px-3 py-2 text-end">
-                <button
+                <RouterLink
                   v-if="item.readingInsightsSharingLevel !== 'private'"
-                  type="button"
+                  :to="{ name: 'settings-admin-shared-insights', params: { userId: item.id } }"
                   class="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   :class="sharingClasses(item.readingInsightsSharingLevel)"
                   :aria-label="t('adminFeature.accountActivity.openInsightsFor', { name: item.name })"
-                  @click="openSharedInsights(item)"
                 >
                   <component :is="sharingIcon(item.readingInsightsSharingLevel)" :size="12" aria-hidden="true" />
                   {{ t(`adminFeature.accountActivity.sharing.${item.readingInsightsSharingLevel}`) }}
                   <ArrowUpRight :size="11" aria-hidden="true" />
-                </button>
+                </RouterLink>
                 <span
                   v-else
                   class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px]"
@@ -336,18 +324,17 @@ function sharingIcon(level: ReadingInsightsSharingLevel) {
           </dl>
           <div class="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
             <span class="text-xs text-muted-foreground">{{ t('adminFeature.accountActivity.columns.readingInsights') }}</span>
-            <button
+            <RouterLink
               v-if="item.readingInsightsSharingLevel !== 'private'"
-              type="button"
+              :to="{ name: 'settings-admin-shared-insights', params: { userId: item.id } }"
               class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               :class="sharingClasses(item.readingInsightsSharingLevel)"
               :aria-label="t('adminFeature.accountActivity.openInsightsFor', { name: item.name })"
-              @click="openSharedInsights(item)"
             >
               <component :is="sharingIcon(item.readingInsightsSharingLevel)" :size="12" aria-hidden="true" />
               {{ t(`adminFeature.accountActivity.sharing.${item.readingInsightsSharingLevel}`) }}
               <ArrowUpRight :size="11" aria-hidden="true" />
-            </button>
+            </RouterLink>
             <span
               v-else
               class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px]"

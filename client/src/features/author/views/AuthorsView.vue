@@ -152,9 +152,8 @@ function syncRouteQuery() {
     },
   })
 }
-
-function openAuthor(authorId: number) {
-  void router.push({ name: 'author-detail', params: { id: authorId }, query: { from: route.fullPath } })
+function authorDetailTo(authorId: number) {
+  return { name: 'author-detail', params: { id: authorId }, query: { from: route.fullPath } }
 }
 
 function setSortField(field: AuthorListSort) {
@@ -203,7 +202,7 @@ function toggleMobileControls() {
   })
 }
 
-function handleAuthorSelect(authorId: number, event: MouseEvent) {
+function handleAuthorSelect(authorId: number, event: MouseEvent | KeyboardEvent) {
   if (!selectionMode.value) {
     enterSelectionMode()
   }
@@ -683,7 +682,7 @@ defineOptions({ name: 'AuthorsView' })
             :can-delete="canDeleteAuthors"
             :refreshing="isRefreshing(author.id)"
             :deleting="deletingAuthorId === author.id"
-            @open="openAuthor"
+            :to="authorDetailTo(author.id)"
             @select="handleAuthorSelect(author.id, $event)"
             @refresh="refreshSingleAuthorMetadata"
             @delete="promptDeleteSingleAuthor"
@@ -698,7 +697,7 @@ defineOptions({ name: 'AuthorsView' })
             :selection-mode="selectionMode"
             :selected="isSelected(author.id)"
             :refreshing="isRefreshing(author.id)"
-            @open="openAuthor"
+            :to="authorDetailTo(author.id)"
             @select="handleAuthorSelect(author.id, $event)"
           />
         </div>

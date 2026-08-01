@@ -2,15 +2,14 @@
 import { computed, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BookCopy, HardDrive, Library, Users } from '@lucide/vue'
-import { useRouter } from 'vue-router'
-import type { RouteLocationRaw } from 'vue-router'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryOverviewWidget } from '../../composables/useLibraryOverviewWidget'
 
 const { data, loading, error } = useLibraryOverviewWidget()
 const { t } = useI18n()
-const router = useRouter()
+
 const { libraries } = useLibraries()
 
 function formatStorage(bytes: number): string {
@@ -44,10 +43,6 @@ const stats = computed<Stat[]>(() => {
     { label: t('dashboard.widgets.libraryOverview.stats.storage'), value: formatStorage(data.value.totalStorageBytes), icon: HardDrive, route: null },
   ]
 })
-
-function navigate(route: StatRoute) {
-  if (route) void router.push(route)
-}
 </script>
 
 <template>
@@ -81,21 +76,30 @@ function navigate(route: StatRoute) {
     <!-- Stats grid -->
     <div v-else class="flex min-h-0 flex-1 flex-col gap-2 p-1">
       <div class="grid min-h-0 flex-1 grid-cols-2 gap-2">
-        <div
-          v-for="stat in stats"
-          :key="stat.label"
-          class="flex min-h-0 min-w-0 items-center justify-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-2 py-1.5 transition-colors"
-          :class="stat.route ? 'cursor-pointer hover:bg-muted/60 hover:border-border' : ''"
-          @click="navigate(stat.route)"
-        >
-          <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-            <component :is="stat.icon" :size="14" />
+        <template v-for="stat in stats" :key="stat.label">
+          <RouterLink
+            v-if="stat.route"
+            :to="stat.route"
+            class="flex min-h-0 min-w-0 items-center justify-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-2 py-1.5 transition-colors hover:border-border hover:bg-muted/60"
+          >
+            <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <component :is="stat.icon" :size="14" />
+            </div>
+            <div class="min-w-0 text-left">
+              <span class="block max-w-full truncate text-[15px] font-bold tabular-nums leading-tight">{{ stat.value }}</span>
+              <span class="block text-[11px] leading-tight text-muted-foreground">{{ stat.label }}</span>
+            </div>
+          </RouterLink>
+          <div v-else class="flex min-h-0 min-w-0 items-center justify-center gap-2 rounded-lg border border-border/50 bg-muted/30 px-2 py-1.5">
+            <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <component :is="stat.icon" :size="14" />
+            </div>
+            <div class="min-w-0 text-left">
+              <span class="block max-w-full truncate text-[15px] font-bold tabular-nums leading-tight">{{ stat.value }}</span>
+              <span class="block text-[11px] leading-tight text-muted-foreground">{{ stat.label }}</span>
+            </div>
           </div>
-          <div class="min-w-0 text-left">
-            <span class="block max-w-full truncate text-[15px] font-bold tabular-nums leading-tight">{{ stat.value }}</span>
-            <span class="block text-[11px] leading-tight text-muted-foreground">{{ stat.label }}</span>
-          </div>
-        </div>
+        </template>
       </div>
 
       <!-- Added this year callout -->

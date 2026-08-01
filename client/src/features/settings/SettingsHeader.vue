@@ -1,22 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { Permission } from '@bookorbit/types'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 
 const { t } = useI18n()
 const route = useRoute()
-const router = useRouter()
 const { isSuperuser, userPermissions } = usePermissions()
 
 interface Section {
   label: string
   routeName: string
-}
-
-function handleNavigate(routeName: string): void {
-  router.push({ name: routeName })
 }
 
 const sections = computed<Section[]>(() => {
@@ -72,14 +67,14 @@ const sections = computed<Section[]>(() => {
 
 <template>
   <div class="flex items-stretch h-11 px-4 border-b overflow-x-auto shrink-0 scrollbar-none snap-x snap-mandatory md:snap-none">
-    <button
+    <RouterLink
       v-for="section in sections"
       :key="section.routeName"
-      class="px-3 h-full text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 snap-start"
+      :to="{ name: section.routeName }"
+      class="inline-flex items-center px-3 h-full text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 snap-start"
       :class="route.name === section.routeName ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'"
-      @click="handleNavigate(section.routeName)"
     >
       {{ section.label }}
-    </button>
+    </RouterLink>
   </div>
 </template>

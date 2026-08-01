@@ -14,7 +14,6 @@ class MockIntersectionObserver {
 
 const mocks = vi.hoisted(() => ({
   route: { params: {} as Record<string, string>, query: {} as Record<string, unknown>, fullPath: '/series' },
-  routerPush: vi.fn<(to: unknown) => Promise<void>>(),
   routerReplace: vi.fn<(to: unknown) => Promise<void>>(),
   fetchLibraries: vi.fn<() => Promise<void>>(),
   load: vi.fn<(reset?: boolean) => Promise<void>>(),
@@ -27,7 +26,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('vue-router', () => ({
   useRoute: () => mocks.route,
-  useRouter: () => ({ push: mocks.routerPush, replace: mocks.routerReplace }),
+  useRouter: () => ({ replace: mocks.routerReplace }),
 }))
 
 vi.mock('@/composables/useDisplaySettings', () => ({
@@ -72,7 +71,6 @@ describe('SeriesView filters panel placement', () => {
   beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
     mocks.route.query = {}
-    mocks.routerPush.mockResolvedValue()
     mocks.routerReplace.mockResolvedValue()
     mocks.fetchLibraries.mockResolvedValue()
     mocks.load.mockResolvedValue()

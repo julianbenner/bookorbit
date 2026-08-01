@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { BookOpen, ExternalLink, FolderPlus, MoreHorizontal, Pencil, RefreshCw, Send, Trash2 } from '@lucide/vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
@@ -22,8 +22,6 @@ const emit = defineEmits<{
   action: [type: BookActionType]
   'update:book': [updated: BookCard]
 }>()
-
-const router = useRouter()
 
 const { t } = useI18n()
 const { hasPermission } = usePermissions()
@@ -63,17 +61,18 @@ async function handleRefresh() {
           <BookOpen :size="13" class="mr-2" />
           {{ t('book.table.actions.quickView') }}
         </DropdownMenuItem>
-        <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id } })">
-          <ExternalLink :size="13" class="mr-2" />
-          {{ t('book.table.actions.bookDetails') }}
+        <DropdownMenuItem as-child>
+          <RouterLink :to="{ name: 'book-detail', params: { bookId: book.id } }">
+            <ExternalLink :size="13" class="mr-2" />
+            {{ t('book.table.actions.bookDetails') }}
+          </RouterLink>
         </DropdownMenuItem>
         <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
-        <DropdownMenuItem
-          v-if="hasPermission('library_edit_metadata')"
-          @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })"
-        >
-          <Pencil :size="13" class="mr-2" />
-          {{ t('book.table.actions.editMetadata') }}
+        <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" as-child>
+          <RouterLink :to="{ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } }">
+            <Pencil :size="13" class="mr-2" />
+            {{ t('book.table.actions.editMetadata') }}
+          </RouterLink>
         </DropdownMenuItem>
         <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="anyRefreshing" @click="handleRefresh">
           <RefreshCw :size="13" class="mr-2" :class="{ 'animate-spin': anyRefreshing }" />

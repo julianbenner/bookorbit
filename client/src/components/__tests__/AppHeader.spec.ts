@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import { nextTick, ref, type Ref } from 'vue'
 import type { GlobalSearchResult } from '@/features/book/composables/useGlobalSearch'
 import AppHeader from '../AppHeader.vue'
@@ -172,9 +172,18 @@ function mountHeader() {
     global: {
       stubs: {
         Transition: false,
+        RouterLink: {
+          name: 'RouterLink',
+          props: ['to'],
+          template: '<a><slot /></a>',
+        },
       },
     },
   })
+}
+
+function routerLinkByText(wrapper: VueWrapper, text: string) {
+  return wrapper.findAllComponents({ name: 'RouterLink' }).find((link) => link.text().trim().includes(text))
 }
 
 describe('AppHeader global search', () => {
@@ -213,6 +222,24 @@ describe('AppHeader global search', () => {
     await input.trigger('keydown', { key: 'Enter' })
 
     expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 101 } })
+  })
+
+  it('renders search results as links and keeps modified clicks side-effect free', async () => {
+    const wrapper = mountHeader()
+    const input = wrapper.get('input[placeholder="Search all books..."]')
+
+    await input.trigger('focus')
+    await input.setValue('Prey')
+
+    const resultLink = routerLinkByText(wrapper, 'Prey')
+    expect(resultLink).toBeDefined()
+    if (!resultLink) throw new Error('Expected a search result link')
+    expect(resultLink.props('to')).toEqual({ name: 'book-detail', params: { bookId: 101 } })
+
+    await resultLink.trigger('click', { button: 1 })
+    await resultLink.trigger('click', { button: 0, ctrlKey: true })
+
+    expect(mocks.clearGlobalSearch).not.toHaveBeenCalled()
   })
 
   it('loads more results from the dropdown footer', async () => {
@@ -257,7 +284,7 @@ describe('AppHeader global search', () => {
     await input.trigger('focus')
     await input.setValue('Prey')
 
-    const renderedResults = wrapper.findAll('button').filter((button) => button.text().startsWith('Prey '))
+    const renderedResults = wrapper.findAllComponents({ name: 'RouterLink' }).filter((link) => link.text().startsWith('Prey '))
     expect(renderedResults.length).toBeGreaterThan(0)
     expect(renderedResults.length).toBeLessThan(60)
     expect(wrapper.text()).toContain('Prey 1')
@@ -296,16 +323,14 @@ describe('AppHeader global search', () => {
     expect(wrapper.text()).not.toContain('Achievements')
   })
 
-  it('navigates to statistics from the mobile overflow menu', async () => {
+  it('renders the statistics target in the mobile overflow menu', () => {
     const wrapper = mountHeader()
-    const statisticsItem = wrapper.findAllComponents({ name: 'DropdownMenuItem' }).find((item) => item.text().trim() === 'Statistics')
+    const statisticsLink = wrapper.findAllComponents({ name: 'RouterLink' }).find((link) => link.text().trim() === 'Statistics')
 
-    expect(statisticsItem).toBeDefined()
-    if (!statisticsItem) throw new Error('Expected statistics overflow menu item')
+    expect(statisticsLink).toBeDefined()
+    if (!statisticsLink) throw new Error('Expected statistics overflow menu link')
 
-    await statisticsItem.trigger('click')
-
-    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'statistics', query: { tab: 'library' } })
+    expect(statisticsLink.props('to')).toEqual({ name: 'statistics', query: { tab: 'library' } })
   })
 
   it('places the desktop language control immediately before settings', () => {
@@ -327,15 +352,13 @@ describe('AppHeader global search', () => {
     expect(settingsControlIndex).toBe(languageControlIndex + 1)
   })
 
-  it('opens settings from the mobile overflow menu', async () => {
+  it('renders the settings target in the mobile overflow menu', () => {
     const wrapper = mountHeader()
-    const settingsItem = wrapper.findAllComponents({ name: 'DropdownMenuItem' }).find((item) => item.text().trim() === 'Settings')
+    const settingsLink = wrapper.findAllComponents({ name: 'RouterLink' }).find((link) => link.text().trim() === 'Settings')
 
-    expect(settingsItem).toBeDefined()
-    if (!settingsItem) throw new Error('Expected settings overflow menu item')
+    expect(settingsLink).toBeDefined()
+    if (!settingsLink) throw new Error('Expected settings overflow menu link')
 
-    await settingsItem.trigger('click')
-
-    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'settings-libraries' })
+    expect(settingsLink.props('to')).toEqual({ name: 'settings-libraries' })
   })
 })

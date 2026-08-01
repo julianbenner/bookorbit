@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { X, Check, AlertCircle, Copy, Loader2, ExternalLink, ChevronDown, FileText, Trash2 } from '@lucide/vue'
 import type { BookDockDiscardDuplicatesResult, BookDockFinalizePreviewResult } from '@bookorbit/types'
 
 import { api } from '@/lib/api'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useBookDockFinalize } from '../composables/useBookDockFinalize'
 
@@ -31,7 +32,6 @@ const emit = defineEmits<{
   finalized: []
 }>()
 
-const router = useRouter()
 const { libraries, fetchLibraries, refreshLibraries } = useLibraries()
 const { result, loading, error, finalize, reset } = useBookDockFinalize()
 
@@ -270,8 +270,8 @@ function handleClose() {
   reset()
 }
 
-function goToBook(bookId: number) {
-  router.push({ name: 'book-detail', params: { bookId } })
+function handleBookNavigation(event: MouseEvent) {
+  if (!isPlainPrimaryClick(event)) return
   handleClose()
 }
 
@@ -401,13 +401,14 @@ async function handleDiscardResultDuplicates() {
               <div v-for="item in previewDuplicateItems.slice(0, 5)" :key="item.fileId" class="flex items-center gap-2 px-2.5 py-1.5">
                 <Copy class="size-3.5 text-amber-500 shrink-0" />
                 <span class="min-w-0 flex-1 truncate font-mono text-xs text-foreground" :title="item.fileName">{{ item.fileName }}</span>
-                <button
+                <RouterLink
                   v-if="item.existingBookId"
+                  :to="{ name: 'book-detail', params: { bookId: item.existingBookId } }"
                   class="text-xs text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 shrink-0"
-                  @click="goToBook(item.existingBookId)"
+                  @click="handleBookNavigation"
                 >
                   {{ t('bookDock.finalizeDialog.viewExisting') }} <ExternalLink class="size-3" />
-                </button>
+                </RouterLink>
               </div>
               <div v-if="previewDuplicateCount > previewDuplicateItems.length" class="px-2.5 py-1.5 text-xs text-muted-foreground">
                 {{
@@ -520,20 +521,22 @@ async function handleDiscardResultDuplicates() {
                 <Copy v-else-if="r.isDuplicate" class="size-3.5 text-amber-500 shrink-0" />
                 <AlertCircle v-else class="size-3.5 text-red-500 shrink-0" />
                 <span class="flex-1 truncate font-mono text-xs" :title="r.newName ?? r.fileName">{{ r.newName ?? r.fileName }}</span>
-                <button
+                <RouterLink
                   v-if="r.success && r.bookId"
+                  :to="{ name: 'book-detail', params: { bookId: r.bookId } }"
                   class="text-xs text-primary hover:underline flex items-center gap-1 shrink-0"
-                  @click="goToBook(r.bookId!)"
+                  @click="handleBookNavigation"
                 >
                   {{ t('bookDock.finalizeDialog.view') }} <ExternalLink class="size-3" />
-                </button>
-                <button
+                </RouterLink>
+                <RouterLink
                   v-if="!r.success && r.isDuplicate && r.existingBookId"
+                  :to="{ name: 'book-detail', params: { bookId: r.existingBookId } }"
                   class="text-xs text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 shrink-0"
-                  @click="goToBook(r.existingBookId!)"
+                  @click="handleBookNavigation"
                 >
                   {{ t('bookDock.finalizeDialog.viewExisting') }} <ExternalLink class="size-3" />
-                </button>
+                </RouterLink>
                 <button
                   v-if="!r.success && !r.isDuplicate && r.message && !isFileExistsError(r.message)"
                   class="text-xs text-red-500 flex items-center gap-1 shrink-0 hover:text-red-600 transition-colors"

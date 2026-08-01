@@ -29,6 +29,7 @@ import LibraryCreatorModal from '@/features/library/components/LibraryCreatorMod
 import { useLibraryCreationRedirect } from '@/features/library/composables/useLibraryCreationRedirect'
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -75,7 +76,8 @@ const activeCollectionId = computed(() => activeIdFor('collection'))
 
 const canManageLibraries = computed(() => hasPermission('manage_libraries'))
 
-function handleNavigate() {
+function handleNavigate(event?: MouseEvent) {
+  if (event && !isPlainPrimaryClick(event)) return
   if (isMobile.value) setOpenMobile(false)
 }
 

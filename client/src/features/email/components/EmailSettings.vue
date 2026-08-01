@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { Permission } from '@bookorbit/types'
 import ProvidersTab from './ProvidersTab.vue'
 import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
@@ -64,11 +64,6 @@ watch(
   },
 )
 
-function selectTab(tab: Tab) {
-  activeTab.value = tab
-  router.replace({ name: 'settings-email', query: { ...route.query, tab } })
-}
-
 const loading = ref(true)
 const error = ref<string | null>(null)
 
@@ -104,19 +99,20 @@ onMounted(async () => {
     <div
       class="flex gap-1 mb-5 md:mb-6 border-b border-border overflow-x-auto md:overflow-visible md:static sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 snap-x"
     >
-      <button
+      <RouterLink
         v-for="tab in tabs"
         :key="tab.id"
+        :to="{ name: 'settings-email', query: { ...route.query, tab: tab.id } }"
+        replace
         class="px-3 py-3 md:py-2 text-sm font-medium shrink-0 border-b-2 -mb-px transition-colors snap-start"
         :class="
           activeTab === tab.id
             ? 'border-primary text-foreground'
             : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
         "
-        @click="selectTab(tab.id)"
       >
         {{ tab.label }}
-      </button>
+      </RouterLink>
     </div>
 
     <ProvidersTab v-if="activeTab === 'providers'" />

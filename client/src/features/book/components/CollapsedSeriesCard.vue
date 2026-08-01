@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { getBookMediaProfile, type BookCard } from '@bookorbit/types'
 import { Library } from '@lucide/vue'
 import BookCoverArtwork from './BookCoverArtwork.vue'
@@ -9,7 +9,6 @@ import BookCoverSurface from './BookCoverSurface.vue'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { useDisplaySettings, type GridCardLabelField } from '@/composables/useDisplaySettings'
-import { fetchAuthors } from '@/features/author/api/author'
 
 const MAX_COLLAPSED_STACK_COVERS = 3
 const STACK_COVER_STEP_PCT = 8
@@ -20,7 +19,6 @@ const props = defineProps<{
 }>()
 
 const route = useRoute()
-const router = useRouter()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const coverAspectRatio = computed(() => props.book.coverAspectRatio ?? injectedCoverAspectRatio.value)
 const { coverUrl } = useCoverVersions()
@@ -110,48 +108,17 @@ function coverVersionFor(bookId: number): string | null | undefined {
   return collapsed.value.coverUpdatedAtByBookId?.[bookId]
 }
 
-function handleClick() {
-  openSeriesDetails()
+const seriesRoute = computed(() =>
+  props.book.seriesId == null ? null : { name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } },
+)
+const authorRoute = computed(() => (authorQuery.value ? { name: 'authors', query: { q: authorQuery.value } } : null))
+
+function labelRoute(field: GridCardLabelField) {
+  return field === 'author' ? authorRoute.value : seriesRoute.value
 }
 
-function openSeriesDetails() {
-  if (props.book.seriesId == null) return
-  void router.push({ name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } })
-}
-
-async function openAuthorDetails() {
-  const authorName = authorQuery.value?.trim()
-  if (!authorName) return
-
-  try {
-    const page = await fetchAuthors({ q: authorName, page: 0, size: 5, sort: 'name', order: 'asc' })
-    const author = page.items.find((item) => item.name.trim().toLocaleLowerCase() === authorName.toLocaleLowerCase())
-    if (author) {
-      void router.push({ name: 'author-detail', params: { id: author.id }, query: { from: route.fullPath } })
-      return
-    }
-  } catch {
-    // Fall back to the filtered author list below.
-  }
-
-  void router.push({ name: 'authors', query: { q: authorName } })
-}
-
-function handleLabelClick(field: GridCardLabelField) {
-  if (field === 'author') {
-    void openAuthorDetails()
-    return
-  }
-  openSeriesDetails()
-}
-
-function handlePrimaryLabelClick() {
-  handleLabelClick(gridCardPrimaryLabel.value)
-}
-
-function handleSecondaryLabelClick() {
-  handleLabelClick(gridCardSecondaryLabel.value)
-}
+const primaryLabelRoute = computed(() => labelRoute(gridCardPrimaryLabel.value))
+const secondaryLabelRoute = computed(() => labelRoute(gridCardSecondaryLabel.value))
 
 function tileClass(index: number): string {
   if (tileCount.value <= 1) return 'col-span-2 row-span-2'
@@ -193,7 +160,7 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
 </script>
 
 <template>
-  <div class="flex flex-col @container cursor-pointer" @click="handleClick">
+  <div class="flex flex-col @container cursor-pointer">
     <!-- Cover -->
     <div class="group">
       <BookCoverSurface
@@ -226,7 +193,6 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
               :is-comic="isComic"
               @error="() => handleCoverError(bookId)"
             />
-
             <template v-if="i === 0">
               <div
                 class="absolute right-1.5 top-1.5 z-20 rounded-sm bg-black/70 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white group-hover:opacity-0 transition-opacity duration-150"
@@ -297,6 +263,7 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
         </div>
 
         <!-- Count badge -->
+        <RouterLink v-if="seriesRoute" :to="seriesRoute" class="absolute inset-0 z-0" :aria-label="seriesName" />
         <div
           v-if="!isStack"
           class="absolute right-1.5 top-1.5 z-10 rounded-sm bg-black/70 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white group-hover:opacity-0 transition-opacity duration-150"
@@ -321,13 +288,14 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
           :class="overlayBackground"
         >
           <div class="flex-1 flex items-center justify-center">
-            <button
+            <RouterLink
+              v-if="seriesRoute"
+              :to="seriesRoute"
               class="size-[30cqi] flex items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all duration-300 scale-75 group-hover:scale-100"
               data-testid="series-hover-action"
-              @click.stop="handleClick"
             >
               <Library class="size-[16cqi]" />
-            </button>
+            </RouterLink>
           </div>
           <div v-if="showHoverText" class="shrink-0 flex flex-col">
             <p class="text-xs font-semibold text-white leading-tight" :class="hoverTitleClampClass">
@@ -347,24 +315,24 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
     </div>
 
     <div v-if="props.showLabel && cardInfoMode === 'below-cover' && (primaryLabelText || secondaryLabelText)" class="grid-card-label">
-      <button
-        v-if="primaryLabelText"
-        type="button"
+      <RouterLink
+        v-if="primaryLabelText && primaryLabelRoute"
+        :to="primaryLabelRoute"
         class="grid-card-label__primary"
         data-testid="grid-card-label-primary"
-        @click.stop="handlePrimaryLabelClick"
       >
         {{ primaryLabelText }}
-      </button>
-      <button
-        v-if="secondaryLabelText"
-        type="button"
+      </RouterLink>
+      <span v-else-if="primaryLabelText" class="grid-card-label__primary">{{ primaryLabelText }}</span>
+      <RouterLink
+        v-if="secondaryLabelText && secondaryLabelRoute"
+        :to="secondaryLabelRoute"
         class="grid-card-label__secondary"
         data-testid="grid-card-label-secondary"
-        @click.stop="handleSecondaryLabelClick"
       >
         {{ secondaryLabelText }}
-      </button>
+      </RouterLink>
+      <span v-else-if="secondaryLabelText" class="grid-card-label__secondary">{{ secondaryLabelText }}</span>
     </div>
   </div>
 </template>
@@ -392,10 +360,6 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
   cursor: pointer;
   min-width: 0;
   width: 100%;
-}
-
-.grid-card-label__primary:hover {
-  text-decoration: underline;
 }
 
 .grid-card-label__secondary {

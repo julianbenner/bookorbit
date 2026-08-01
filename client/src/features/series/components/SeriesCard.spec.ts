@@ -10,6 +10,17 @@ vi.mock('@/features/book/composables/useCoverVersions', () => ({
   }),
 }))
 
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: {
+    to: {
+      type: [String, Object],
+      required: true,
+    },
+  },
+  template: '<a><slot /></a>',
+})
+
 const BookCoverArtworkStub = defineComponent({
   name: 'BookCoverArtwork',
   props: {
@@ -41,11 +52,12 @@ function makeSeries(overrides: Partial<SeriesSummary> = {}): SeriesSummary {
 
 function mountCard(series: SeriesSummary): VueWrapper {
   return mount(SeriesCard, {
-    props: { series },
+    props: { series, to: { name: 'series-detail', params: { seriesId: series.id } } },
     global: {
       stubs: {
         BookCoverArtwork: BookCoverArtworkStub,
         SeriesCompletionBar: true,
+        RouterLink: RouterLinkStub,
       },
     },
   })
@@ -62,13 +74,12 @@ function getCoverStyleAt(wrapper: VueWrapper, index: number): string {
 }
 
 describe('SeriesCard', () => {
-  it('emits open on card click and renders compact author text', async () => {
+  it('renders the series detail link and compact author text', () => {
     const wrapper = mountCard(makeSeries({ authors: ['A1', 'A2', 'A3'] }))
 
-    await wrapper.get('.group.flex.h-full.cursor-pointer.flex-col').trigger('click')
-
-    expect(wrapper.emitted('open')).toEqual([[42]])
-    expect(wrapper.text()).toContain('A1, A2 +1')
+    const link = wrapper.getComponent(RouterLinkStub)
+    expect(link.props('to')).toEqual({ name: 'series-detail', params: { seriesId: 42 } })
+    expect(link.text()).toContain('A1, A2 +1')
   })
 
   it('keeps non-square covers at base scale', async () => {

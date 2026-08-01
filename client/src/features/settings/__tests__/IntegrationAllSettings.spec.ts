@@ -14,6 +14,11 @@ const routerState = {
 }
 
 vi.mock('vue-router', () => ({
+  RouterLink: {
+    name: 'RouterLink',
+    props: { to: { type: [String, Object, Array], required: true }, replace: Boolean },
+    template: '<a><slot /></a>',
+  },
   useRoute: () => ({ query: routerState.currentQuery }),
   useRouter: () => ({
     replace: vi.fn<(to: { name: string; query: Record<string, string> }) => void>((to) => {
@@ -50,16 +55,13 @@ describe('IntegrationAllSettings', () => {
   it('shows only the integrations the user can access', () => {
     const wrapper = mountComponent(undefined, ['readwise_sync'])
 
-    expect(wrapper.findAll('button').map((button) => button.text())).toEqual(['Readwise'])
-    expect(wrapper.find('[data-testid="readwise-settings"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="hardcover-settings"]').exists()).toBe(false)
+    expect(wrapper.findAll('a').map((link) => link.text())).toEqual(['Readwise'])
   })
 
   it('shows every integration to a superuser', () => {
     const wrapper = mountComponent(undefined, [], true)
 
-    expect(wrapper.findAll('button').map((button) => button.text())).toEqual(['Hardcover', 'Readwise', 'StoryGraph'])
-    expect(wrapper.find('[data-testid="hardcover-settings"]').exists()).toBe(true)
+    expect(wrapper.findAll('a').map((link) => link.text())).toEqual(['Hardcover', 'Readwise', 'StoryGraph'])
   })
 
   it('shows the requested accessible sub-tab', () => {
@@ -75,20 +77,19 @@ describe('IntegrationAllSettings', () => {
     expect(wrapper.find('[data-testid="readwise-settings"]').exists()).toBe(true)
   })
 
-  it('uses a query parameter when selecting a sub-tab', async () => {
+  it('renders the selected integration tab route target', () => {
     const wrapper = mountComponent('hardcover', ['hardcover_sync', 'readwise_sync'])
-    const readwiseButton = wrapper.findAll('button').find((button) => button.text() === 'Readwise')
+    const readwiseLink = wrapper.findAllComponents({ name: 'RouterLink' }).find((link) => link.text() === 'Readwise')
 
-    await readwiseButton!.trigger('click')
-
-    expect(routerState.replacedQuery).toEqual({ tab: 'readwise' })
-    expect(wrapper.find('[data-testid="readwise-settings"]').exists()).toBe(true)
+    expect(readwiseLink).toBeDefined()
+    expect(readwiseLink?.props('to')).toEqual({ name: 'settings-integrations', query: { tab: 'readwise' } })
+    expect(readwiseLink?.props('replace')).toBe(true)
   })
 
   it('shows a permission message when no integration is available', () => {
     const wrapper = mountComponent()
 
-    expect(wrapper.findAll('button')).toHaveLength(0)
+    expect(wrapper.findAll('a')).toHaveLength(0)
     expect(wrapper.text()).toContain('You do not have permission to use any integrations.')
   })
 })

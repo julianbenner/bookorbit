@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
+import { ref, defineComponent } from 'vue'
 import type { BookDetail } from '@bookorbit/types'
 import BookQuickView from '../BookQuickView.vue'
 
@@ -27,6 +27,16 @@ vi.mock('vue-router', async (importOriginal) => {
       push: pushMock,
     }),
   }
+})
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: {
+    to: {
+      type: [String, Object],
+      required: true,
+    },
+  },
+  template: '<a><slot /></a>',
 })
 
 vi.mock('@/features/auth/composables/usePermissions', () => ({
@@ -119,6 +129,7 @@ function makeDetail(overrides: Partial<BookDetail> = {}): BookDetail {
 
 const globalStubs = {
   stubs: {
+    RouterLink: RouterLinkStub,
     Sheet: { template: '<div><slot /></div>' },
     SheetContent: { template: '<div><slot /></div>' },
     SheetTitle: { template: '<div><slot /></div>' },
@@ -191,6 +202,55 @@ describe('BookQuickView', () => {
     expect(wrapper.emitted('update:open')).toEqual([[false]])
     expect(wrapper.emitted('action')).toEqual([['delete']])
   })
+  it('renders reader, details, and edit links with dynamic destinations', () => {
+    const wrapper = mount(BookQuickView, {
+      props: { open: true, bookId: 42 },
+      global: globalStubs,
+    })
+    const routes = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'))
+
+    expect(routes).toContainEqual({
+      name: 'reader',
+      params: { bookId: 42, fileId: 11 },
+      query: { format: 'EPUB' },
+    })
+    expect(routes).toContainEqual({ name: 'book-detail', params: { bookId: 42 } })
+    expect(routes).toContainEqual({ name: 'book-detail', params: { bookId: 42 }, query: { tab: 'edit' } })
+  })
+
+  it('closes only for an unmodified primary click on a navigation link', async () => {
+    const wrapper = mount(BookQuickView, {
+      props: { open: true, bookId: 42 },
+      global: globalStubs,
+    })
+    const readerLink = wrapper.findAllComponents(RouterLinkStub).find((link) => {
+      const to = link.props('to')
+      return typeof to === 'object' && to !== null && 'name' in to && to.name === 'reader'
+    })
+
+    expect(readerLink).toBeDefined()
+    await readerLink!.trigger('click', { button: 0 })
+
+    expect(wrapper.emitted('update:open')).toEqual([[false]])
+  })
+
+  it.each([{ button: 1 }, { button: 0, ctrlKey: true }, { button: 0, metaKey: true }, { button: 0, shiftKey: true }, { button: 0, altKey: true }])(
+    'keeps quick view open for modified or non-primary clicks (%o)',
+    async (event) => {
+      const wrapper = mount(BookQuickView, {
+        props: { open: true, bookId: 42 },
+        global: globalStubs,
+      })
+      const readerLink = wrapper.findAllComponents(RouterLinkStub).find((link) => {
+        const to = link.props('to')
+        return typeof to === 'object' && to !== null && 'name' in to && to.name === 'reader'
+      })
+
+      await readerLink!.trigger('click', event)
+
+      expect(wrapper.emitted('update:open')).toBeUndefined()
+    },
+  )
 
   it('hides delete action when delete permission is missing', () => {
     permissionState.canDelete = false

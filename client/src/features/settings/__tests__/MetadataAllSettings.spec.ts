@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('vue-router', () => ({
+  RouterLink: { name: 'RouterLink', props: ['to', 'replace'], template: '<a><slot /></a>' },
   useRoute: () => mocks.route,
   useRouter: () => ({ replace: mocks.replace }),
 }))

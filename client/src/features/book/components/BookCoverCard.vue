@@ -2,7 +2,7 @@
 import type { BookCard, BookFileRef, CoverAspectRatio } from '@bookorbit/types'
 import { FORMAT_TO_GROUP, getBookMediaProfile, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import { getFormatColor } from '../lib/format-colors'
-import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   BookOpen,
@@ -50,7 +50,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import BookCoverArtwork from './BookCoverArtwork.vue'
 import BookCoverSurface from './BookCoverSurface.vue'
-import { fetchAuthors } from '@/features/author/api/author'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
@@ -166,15 +165,14 @@ const coverImageRatio = ref<number | null>(null)
 const isMissing = computed(() => props.book.status === 'missing')
 const showMobileOverlay = ref(false)
 const root = ref<HTMLElement | null>(null)
+const isTouch = computed(
+  () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches,
+)
 const coverSlotRatio = computed(() => coverAspectRatioValue(String(effectiveCoverAspectRatio.value)))
 const coverOverlayFrameStyle = computed(() => {
   if (bookCoverDisplayMode.value !== 'natural-bottom' || !props.book.hasCover || !coverLoaded.value || coverFailed.value) return { inset: '0' }
   return fittedCoverFrameStyle(coverImageRatio.value, coverSlotRatio.value, 'bottom')
 })
-
-const isTouch = computed(
-  () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches,
-)
 
 watch(coverSrc, () => {
   coverLoaded.value = false
@@ -194,124 +192,49 @@ function handleArtworkError() {
   coverImageRatio.value = null
 }
 
-function openFile(file: BookFileRef, mode?: 'peek') {
-  router.push({
+function readerRoute(file: BookFileRef, mode?: 'peek') {
+  return {
     name: 'reader',
     params: { bookId: props.book.id, fileId: file.id },
     query: mode === 'peek' ? { format: file.format ?? 'epub', mode } : { format: file.format ?? 'epub' },
-  })
+  }
 }
+
+const bookDetailRoute = computed(() => ({ name: 'book-detail', params: { bookId: props.book.id } }))
+const primaryRoute = computed(() =>
+  thumbnailClickAction.value === 'details' ? bookDetailRoute.value : primaryFile.value && !isMissing.value ? readerRoute(primaryFile.value) : null,
+)
+
+function labelRoute(field: GridCardLabelField) {
+  if (field === 'book-title') return bookDetailRoute.value
+  if (field === 'author' && authorQuery.value) return { name: 'authors', query: { q: authorQuery.value } }
+  if ((field === 'series-title' || field === 'series-title-position') && props.book.seriesId != null) {
+    return { name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } }
+  }
+  return null
+}
+
+const primaryLabelRoute = computed(() => labelRoute(gridCardPrimaryLabel.value))
+const secondaryLabelRoute = computed(() => labelRoute(gridCardSecondaryLabel.value))
 
 function peekPrimaryFile() {
   if (!primaryFile.value || isMissing.value) return
-  openFile(primaryFile.value, 'peek')
-}
-
-function openBookDetails() {
-  void router.push({ name: 'book-detail', params: { bookId: props.book.id } })
-}
-
-function openSeriesDetails() {
-  if (props.book.seriesId == null) return
-  void router.push({ name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } })
-}
-
-async function openAuthorDetails() {
-  const authorName = authorQuery.value?.trim()
-  if (!authorName) return
-
-  try {
-    const page = await fetchAuthors({ q: authorName, page: 0, size: 5, sort: 'name', order: 'asc' })
-    const author = page.items.find((item) => item.name.trim().toLocaleLowerCase() === authorName.toLocaleLowerCase())
-    if (author) {
-      void router.push({ name: 'author-detail', params: { id: author.id }, query: { from: route.fullPath } })
-      return
-    }
-  } catch {
-    // Fall back to the filtered author list below.
-  }
-
-  void router.push({ name: 'authors', query: { q: authorName } })
-}
-
-function openLabelTarget(field: GridCardLabelField) {
-  if (field === 'book-title') {
-    openBookDetails()
-    return
-  }
-  if (field === 'author') {
-    void openAuthorDetails()
-    return
-  }
-  if (field === 'series-title' || field === 'series-title-position') {
-    openSeriesDetails()
-  }
-}
-
-function handleLabelClick(field: GridCardLabelField, event: MouseEvent) {
-  if (props.selectionMode) {
-    emit('select', event)
-    return
-  }
-  openLabelTarget(field)
-}
-
-function handlePrimaryLabelClick(event: MouseEvent) {
-  handleLabelClick(gridCardPrimaryLabel.value, event)
-}
-
-function handleSecondaryLabelClick(event: MouseEvent) {
-  handleLabelClick(gridCardSecondaryLabel.value, event)
-}
-
-const isPrimaryClickAvailable = computed(() => thumbnailClickAction.value === 'details' || (primaryFile.value != null && !isMissing.value))
-const showPrimaryOverlayAction = computed(() => thumbnailClickAction.value === 'details' || (primaryFile.value != null && !isMissing.value))
-const primaryOverlayActionIcon = computed(() => {
-  if (thumbnailClickAction.value === 'details') return BookText
-  return isAudiobook.value ? Play : BookOpen
-})
-const primaryOverlayActionIconClass = computed(() => (thumbnailClickAction.value !== 'details' && isAudiobook.value ? 'ml-[2cqi]' : ''))
-const showExplicitReadButton = computed(() => thumbnailClickAction.value === 'details' && primaryFile.value != null && !isMissing.value)
-
-function handlePrimaryOverlayAction() {
-  if (thumbnailClickAction.value === 'details') {
-    openBookDetails()
-    return
-  }
-
-  if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
-}
-
-function openPrimaryFileExplicit() {
-  if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
+  router.push(readerRoute(primaryFile.value, 'peek'))
 }
 
 function handleCardClick(event: MouseEvent) {
   const target = event.target
-  if (target instanceof Element && target.closest('button, [data-card-click-blocker]')) return
+  if (target instanceof Element && target.closest('button, a, [data-card-click-blocker]')) return
   if (props.selectionMode) {
     emit('select', event)
     return
   }
-
-  if (thumbnailClickAction.value === 'details') {
-    openBookDetails()
-    return
-  }
-
-  if (isTouch.value) {
-    showMobileOverlay.value = !showMobileOverlay.value
-    return
-  }
-
-  if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
+  if (isTouch.value) showMobileOverlay.value = !showMobileOverlay.value
 }
 
 function handleClickOutside(event: MouseEvent) {
   if (!showMobileOverlay.value) return
-  if (!root.value?.contains(event.target as Node)) {
-    showMobileOverlay.value = false
-  }
+  if (!root.value?.contains(event.target as Node)) showMobileOverlay.value = false
 }
 
 onMounted(() => {
@@ -326,10 +249,14 @@ function openQuickView() {
   emit('action', 'quick-view')
 }
 
-function openAuthorBrowse() {
-  if (!authorQuery.value) return
-  void router.push({ name: 'authors', query: { q: authorQuery.value } })
-}
+const isPrimaryClickAvailable = computed(() => primaryRoute.value != null)
+const showPrimaryOverlayAction = computed(() => primaryRoute.value != null)
+const primaryOverlayActionIcon = computed(() => {
+  if (thumbnailClickAction.value === 'details') return BookText
+  return isAudiobook.value ? Play : BookOpen
+})
+const primaryOverlayActionIconClass = computed(() => (thumbnailClickAction.value !== 'details' && isAudiobook.value ? 'ml-[2cqi]' : ''))
+const showExplicitReadButton = computed(() => thumbnailClickAction.value === 'details' && primaryFile.value != null && !isMissing.value)
 
 const showHoverTitle = computed(
   () => (cardInfoMode.value === 'hover-overlay' || !props.showLabel) && (coverLoaded.value || !props.book.hasCover || coverFailed.value),
@@ -405,7 +332,6 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
     class="flex flex-col @container touch-manipulation"
     :class="[selectionMode || isPrimaryClickAvailable ? 'cursor-pointer' : 'cursor-default', selectionMode ? 'select-none' : '']"
     @click="handleCardClick"
-    @contextmenu.prevent
   >
     <!-- Cover -->
     <div class="group">
@@ -435,13 +361,19 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
           @load="handleArtworkLoad"
           @error="handleArtworkError"
         />
+        <RouterLink
+          v-if="!selectionMode && primaryRoute"
+          :to="primaryRoute"
+          class="absolute inset-0 z-0"
+          :aria-label="book.title ?? t('book.untitled')"
+        />
 
         <div data-testid="cover-overlay-frame" class="absolute z-10 overflow-hidden rounded-[inherit]" :style="coverOverlayFrameStyle">
           <!-- Top-left overlay: read status -->
           <div
             v-if="showReadBadge && !isMissing"
             class="absolute top-1.5 left-1.5 z-10 flex items-center justify-center rounded-full bg-black/60 p-1 pointer-events-none transition-opacity duration-150"
-            :class="[overlayFadeClass, overlayFadeClass ? '' : showMobileOverlay ? 'opacity-0 pointer-events-none' : '']"
+            :class="overlayFadeClass"
           >
             <component :is="STATUS_ICONS[localReadStatus!]" :size="12" :class="STATUS_COLORS[localReadStatus!]" />
           </div>
@@ -450,8 +382,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
           <div class="absolute top-1.5 right-1.5 z-10 flex flex-col items-end gap-1 pointer-events-none">
             <div
               v-if="showLockStatusPill"
-              class="flex items-center justify-center rounded-full bg-black/60 p-1 transition-opacity duration-150"
-              :class="showMobileOverlay ? 'opacity-0 pointer-events-none' : 'group-hover:opacity-0'"
+              class="flex items-center justify-center rounded-full bg-black/60 p-1 transition-opacity duration-150 group-hover:opacity-0"
             >
               <component :is="metadataLocked ? Lock : LockOpen" :size="12" :class="metadataLocked ? 'text-amber-400' : 'text-emerald-400'" />
             </div>
@@ -460,8 +391,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
               <TooltipTrigger as-child>
                 <div
                   data-card-click-blocker
-                  class="pointer-events-auto flex items-center bg-black/60 rounded-full px-1.5 py-0.5 transition-opacity duration-150 cursor-default"
-                  :class="showMobileOverlay ? 'opacity-0 pointer-events-none' : 'group-hover:opacity-0 group-hover:pointer-events-none'"
+                  class="pointer-events-auto flex items-center bg-black/60 rounded-full px-1.5 py-0.5 transition-opacity duration-150 cursor-default group-hover:opacity-0 group-hover:pointer-events-none"
                 >
                   <span class="text-[9px] font-bold text-white leading-none">{{ seriesPositionLabel }}</span>
                 </div>
@@ -547,26 +477,25 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
               <button class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white" @click="openQuickView">
                 <PanelRight class="size-[12cqi]" />
               </button>
-              <button
-                v-if="showExplicitReadButton"
+              <RouterLink
+                v-if="showExplicitReadButton && primaryFile"
+                :to="readerRoute(primaryFile)"
                 class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white"
-                @click.stop="openPrimaryFileExplicit"
               >
                 <BookOpen class="size-[12cqi]" />
-              </button>
+              </RouterLink>
             </div>
 
             <!-- Center: primary thumbnail action -->
             <div class="flex-1 flex items-center justify-center">
-              <button
-                v-if="showPrimaryOverlayAction"
+              <RouterLink
+                v-if="showPrimaryOverlayAction && primaryRoute"
                 data-testid="grid-card-primary-action"
-                class="size-[30cqi] flex items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all duration-300 scale-75 hover:scale-110 active:scale-90"
-                :class="[showMobileOverlay || 'group-hover:scale-100', showMobileOverlay ? 'scale-100' : '']"
-                @click.stop="handlePrimaryOverlayAction"
+                :to="primaryRoute"
+                class="size-[30cqi] flex items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all duration-300 scale-75 hover:scale-110 active:scale-90 group-hover:scale-100"
               >
                 <component :is="primaryOverlayActionIcon" class="size-[16cqi]" :class="primaryOverlayActionIconClass" />
-              </button>
+              </RouterLink>
             </div>
 
             <!-- Bottom: title/author (hover-overlay mode only) + kebab (when not in below-cover label row) -->
@@ -578,11 +507,13 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                 <div v-else class="flex-1" />
               </div>
 
-              <div v-if="showAuthorOnHover" class="min-w-0">
-                <button class="text-[10px] text-white/70 truncate hover:underline text-left block w-full" @click.stop="openAuthorBrowse">
-                  {{ authorLine }}
-                </button>
-              </div>
+              <RouterLink
+                v-if="showAuthorOnHover && authorQuery"
+                :to="{ name: 'authors', query: { q: authorQuery } }"
+                class="text-[10px] text-white/70 truncate hover:underline text-left block w-full"
+              >
+                {{ authorLine }}
+              </RouterLink>
             </div>
 
             <!-- Kebab menu anchored to lower-right (not in below-cover mode, where it lives in the label row) -->
@@ -594,9 +525,11 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
-                    <BookOpen class="size-4 mr-2" />
-                    {{ t('book.actions.read') }}
+                  <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" as-child>
+                    <RouterLink :to="readerRoute(primaryFile)">
+                      <BookOpen class="size-4 mr-2" />
+                      {{ t('book.actions.read') }}
+                    </RouterLink>
                   </DropdownMenuItem>
                   <DropdownMenuSub v-else-if="openableFiles.length > 1 && !isMissing">
                     <DropdownMenuSubTrigger>
@@ -604,12 +537,14 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                       {{ t('book.actions.read') }}
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
-                      <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
-                        <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">{{ t('book.file.audiobook') }}</span>
-                        <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                        <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary">{{
-                          t('book.file.primary')
-                        }}</span>
+                      <DropdownMenuItem v-for="file in openableFiles" :key="file.id" as-child>
+                        <RouterLink :to="readerRoute(file)">
+                          <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">{{ t('book.file.audiobook') }}</span>
+                          <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                          <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary">{{
+                            t('book.file.primary')
+                          }}</span>
+                        </RouterLink>
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
@@ -644,9 +579,11 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
 
-                  <DropdownMenuItem @click="openBookDetails">
-                    <BookText class="size-4 mr-2" />
-                    {{ t('book.actions.bookDetails') }}
+                  <DropdownMenuItem as-child>
+                    <RouterLink :to="bookDetailRoute">
+                      <BookText class="size-4 mr-2" />
+                      {{ t('book.actions.bookDetails') }}
+                    </RouterLink>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
                   <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
@@ -655,9 +592,11 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                       {{ t('book.actions.metadata') }}
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
-                      <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
-                        <Pencil class="size-4 mr-2" />
-                        {{ t('book.actions.editMetadata') }}
+                      <DropdownMenuItem as-child>
+                        <RouterLink :to="{ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } }">
+                          <Pencil class="size-4 mr-2" />
+                          {{ t('book.actions.editMetadata') }}
+                        </RouterLink>
                       </DropdownMenuItem>
                       <DropdownMenuItem :disabled="anyRefreshing" @click="handleRefreshMetadata">
                         <Loader2 v-if="anyRefreshing" class="size-4 mr-2 animate-spin" />
@@ -720,12 +659,20 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
     <!-- Below-cover label row (below-cover mode only) -->
     <div v-if="showBelowCoverLabelArea" class="grid-card-label" data-testid="grid-card-label">
       <div class="grid-card-label__primary-row">
+        <RouterLink
+          v-if="primaryLabelText && primaryLabelRoute && !selectionMode"
+          :to="primaryLabelRoute"
+          class="grid-card-label__button grid-card-label__primary min-w-0 flex-1 truncate"
+          data-testid="grid-card-label-primary"
+        >
+          {{ primaryLabelText }}
+        </RouterLink>
         <button
-          v-if="primaryLabelText"
+          v-else-if="primaryLabelText"
           type="button"
           class="grid-card-label__button grid-card-label__primary min-w-0 flex-1 truncate"
           data-testid="grid-card-label-primary"
-          @click.stop="handlePrimaryLabelClick"
+          @click.stop="emit('select', $event)"
         >
           {{ primaryLabelText }}
         </button>
@@ -737,9 +684,11 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
-              <BookOpen class="size-4 mr-2" />
-              {{ t('book.actions.read') }}
+            <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" as-child>
+              <RouterLink :to="readerRoute(primaryFile)">
+                <BookOpen class="size-4 mr-2" />
+                {{ t('book.actions.read') }}
+              </RouterLink>
             </DropdownMenuItem>
             <DropdownMenuSub v-else-if="openableFiles.length > 1 && !isMissing">
               <DropdownMenuSubTrigger>
@@ -747,12 +696,14 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                 {{ t('book.actions.read') }}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuItem v-for="file in openableFiles" :key="file.id" @click="openFile(file)">
-                  <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">{{ t('book.file.audiobook') }}</span>
-                  <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
-                  <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary">{{
-                    t('book.file.primary')
-                  }}</span>
+                <DropdownMenuItem v-for="file in openableFiles" :key="file.id" as-child>
+                  <RouterLink :to="readerRoute(file)">
+                    <span v-if="isMultiTrackAudio && FORMAT_TO_GROUP[file.format!] === 'audio'">{{ t('book.file.audiobook') }}</span>
+                    <span v-else>{{ file.format?.toUpperCase() ?? '?' }}</span>
+                    <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="ml-auto pl-4 text-[10px] text-primary">{{
+                      t('book.file.primary')
+                    }}</span>
+                  </RouterLink>
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>
@@ -786,9 +737,11 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            <DropdownMenuItem @click="openBookDetails">
-              <BookText class="size-4 mr-2" />
-              {{ t('book.actions.bookDetails') }}
+            <DropdownMenuItem as-child>
+              <RouterLink :to="bookDetailRoute">
+                <BookText class="size-4 mr-2" />
+                {{ t('book.actions.bookDetails') }}
+              </RouterLink>
             </DropdownMenuItem>
             <DropdownMenuSeparator v-if="hasPermission('library_edit_metadata')" />
             <DropdownMenuSub v-if="hasPermission('library_edit_metadata')">
@@ -797,9 +750,11 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                 {{ t('book.actions.metadata') }}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuItem @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">
-                  <Pencil class="size-4 mr-2" />
-                  {{ t('book.actions.editMetadata') }}
+                <DropdownMenuItem as-child>
+                  <RouterLink :to="{ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } }">
+                    <Pencil class="size-4 mr-2" />
+                    {{ t('book.actions.editMetadata') }}
+                  </RouterLink>
                 </DropdownMenuItem>
                 <DropdownMenuItem :disabled="anyRefreshing" @click="handleRefreshMetadata">
                   <Loader2 v-if="anyRefreshing" class="size-4 mr-2 animate-spin" />
@@ -846,12 +801,20 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <RouterLink
+        v-if="secondaryLabelText && secondaryLabelRoute && !selectionMode"
+        :to="secondaryLabelRoute"
+        class="grid-card-label__button grid-card-label__secondary w-full"
+        data-testid="grid-card-label-secondary"
+      >
+        {{ secondaryLabelText }}
+      </RouterLink>
       <button
-        v-if="secondaryLabelText"
+        v-else-if="secondaryLabelText"
         type="button"
         class="grid-card-label__button grid-card-label__secondary w-full"
         data-testid="grid-card-label-secondary"
-        @click.stop="handleSecondaryLabelClick"
+        @click.stop="emit('select', $event)"
       >
         {{ secondaryLabelText }}
       </button>

@@ -33,7 +33,6 @@ const props = defineProps<{
   isFullyLocked: boolean
   lockedFieldCount: number
   selectionMode: boolean
-  alwaysShowOpenLinkIcon: boolean
   value: unknown
   searchFn?: (q: string) => Promise<string[]>
   openLink?: string | null
@@ -48,7 +47,6 @@ const emit = defineEmits<{
   save: [value: unknown]
   cancel: []
   navigate: [direction: NavigationDirection]
-  coverClick: []
   toggleLock: []
   lockAll: []
   unlockAll: []
@@ -106,7 +104,6 @@ const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GR
     :has-cover="book.hasCover"
     :is-audio="isAudiobook"
     :is-comic="isComic"
-    @cover-click="emit('coverClick')"
   />
 
   <BookTableLockableCell v-else-if="cellType === 'text'" :is-locked="isLocked" :has-lock-field="hasLockField" @toggle-lock="emit('toggleLock')">
@@ -114,7 +111,6 @@ const isComic = computed(() => primaryFile.value?.format != null && FORMAT_TO_GR
       :value="asString(value)"
       :is-active="isActive"
       :is-read-only="isReadOnly"
-      :always-show-open-link-icon="alwaysShowOpenLinkIcon"
       :search-fn="searchFn"
       :open-link="openLink"
       :open-link-label="openLinkLabel"

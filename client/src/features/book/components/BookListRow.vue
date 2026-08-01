@@ -150,32 +150,21 @@ const { refreshing, refreshWithFeedback } = useRefreshMetadata()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const coverAspectRatio = computed(() => props.book.coverAspectRatio ?? injectedCoverAspectRatio.value)
 
-function openFile(file: BookFileRef, mode?: 'peek') {
-  router.push({
+function readerRoute(file: BookFileRef, mode?: 'peek') {
+  return {
     name: 'reader',
     params: { bookId: props.book.id, fileId: file.id },
     query: mode === 'peek' ? { format: file.format ?? 'epub', mode } : { format: file.format ?? 'epub' },
-  })
+  }
 }
 
 function peekPrimaryFile() {
   if (!primaryFile.value || isMissing.value) return
-  openFile(primaryFile.value, 'peek')
+  router.push(readerRoute(primaryFile.value, 'peek'))
 }
 
-function openAuthorBrowse() {
-  if (!authorQuery.value) return
-  void router.push({ name: 'authors', query: { q: authorQuery.value } })
-}
-
-function openBookDetails() {
-  void router.push({ name: 'book-detail', params: { bookId: props.book.id } })
-}
-
-function openSeriesDetails() {
-  if (props.book.seriesId == null) return
-  void router.push({ name: 'series-detail', params: { seriesId: props.book.seriesId } })
-}
+const bookDetailRoute = computed(() => ({ name: 'book-detail', params: { bookId: props.book.id } }))
+const seriesDetailRoute = computed(() => (props.book.seriesId == null ? null : { name: 'series-detail', params: { seriesId: props.book.seriesId } }))
 
 function collapsedCoverVersion(bookId: number): string | null | undefined {
   if (bookId === props.book.id) return props.book.updatedAt ?? props.book.addedAt
@@ -192,17 +181,9 @@ function handleRowClick(event: MouseEvent) {
     return
   }
 
-  if (isCollapsedSeries.value) {
-    openSeriesDetails()
-    return
+  if (!isCollapsedSeries.value && thumbnailClickAction.value !== 'details') {
+    emit('action', 'quick-view')
   }
-
-  if (thumbnailClickAction.value === 'details') {
-    openBookDetails()
-    return
-  }
-
-  emit('action', 'quick-view')
 }
 </script>
 
@@ -265,14 +246,26 @@ function handleRowClick(event: MouseEvent) {
 
     <div class="flex min-w-0 flex-1 flex-col gap-1">
       <div class="flex min-w-0 items-center gap-2">
-        <span class="truncate text-sm font-semibold leading-snug text-foreground">{{ collapsedSeriesName }}</span>
+        <RouterLink
+          v-if="!selectionMode && seriesDetailRoute"
+          :to="seriesDetailRoute"
+          class="truncate text-sm font-semibold leading-snug text-foreground hover:underline"
+        >
+          {{ collapsedSeriesName }}
+        </RouterLink>
+        <span v-else class="truncate text-sm font-semibold leading-snug text-foreground">{{ collapsedSeriesName }}</span>
         <span class="hidden shrink-0 rounded-sm bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary sm:inline-flex">
           {{ t('book.collapsedSeries.label') }}
         </span>
       </div>
-      <button v-if="authorLine" class="w-fit max-w-full truncate text-xs text-muted-foreground hover:underline" @click.stop="openAuthorBrowse">
+      <RouterLink
+        v-if="authorLine && authorQuery && !selectionMode"
+        :to="{ name: 'authors', query: { q: authorQuery } }"
+        class="w-fit max-w-full truncate text-xs text-muted-foreground hover:underline"
+      >
         {{ authorLine }}
-      </button>
+      </RouterLink>
+      <span v-else-if="authorLine" class="w-fit max-w-full truncate text-xs text-muted-foreground">{{ authorLine }}</span>
       <div class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
         <LibraryBig class="size-3.5 shrink-0 text-muted-foreground" />
         <span class="truncate">{{ collapsedCountLabel }}</span>
@@ -337,10 +330,34 @@ function handleRowClick(event: MouseEvent) {
 
     <!-- Main info -->
     <div class="flex flex-col min-w-0 flex-1 gap-0.5">
-      <span class="text-sm font-medium text-foreground truncate leading-snug" :class="isMissing ? 'opacity-60' : ''">{{ book.title ?? '-' }}</span>
-      <button v-if="authorLine" class="w-fit max-w-full text-xs text-muted-foreground truncate hover:underline" @click.stop="openAuthorBrowse">
-        {{ authorLine }}
+      <RouterLink
+        v-if="!selectionMode && thumbnailClickAction === 'details'"
+        :to="bookDetailRoute"
+        class="text-sm font-medium text-foreground truncate leading-snug hover:underline"
+        :class="isMissing ? 'opacity-60' : ''"
+      >
+        {{ book.title ?? '-' }}
+      </RouterLink>
+      <button
+        v-else-if="!selectionMode"
+        type="button"
+        class="w-fit max-w-full text-left text-sm font-medium text-foreground truncate leading-snug hover:underline"
+        :class="isMissing ? 'opacity-60' : ''"
+        @click.stop="emit('action', 'quick-view')"
+      >
+        {{ book.title ?? '-' }}
       </button>
+      <span v-else class="text-sm font-medium text-foreground truncate leading-snug" :class="isMissing ? 'opacity-60' : ''">{{
+        book.title ?? '-'
+      }}</span>
+      <RouterLink
+        v-if="authorLine && authorQuery && !selectionMode"
+        :to="{ name: 'authors', query: { q: authorQuery } }"
+        class="w-fit max-w-full text-xs text-muted-foreground truncate hover:underline"
+      >
+        {{ authorLine }}
+      </RouterLink>
+      <span v-else-if="authorLine" class="w-fit max-w-full text-xs text-muted-foreground truncate">{{ authorLine }}</span>
       <span v-if="seriesLine" class="text-xs text-muted-foreground truncate italic">{{ seriesLine }}</span>
       <span v-if="metaLine" class="text-xs text-muted-foreground truncate">{{ metaLine }}</span>
       <div v-if="visibleTags.length > 0" class="flex items-center gap-1 flex-wrap">
@@ -381,23 +398,23 @@ function handleRowClick(event: MouseEvent) {
         </span>
         <Tooltip v-if="primaryFile && !isMissing">
           <TooltipTrigger as-child>
-            <button
+            <RouterLink
+              :to="readerRoute(primaryFile)"
               class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary hover:bg-primary/25 transition-colors"
-              @click="openFile(primaryFile)"
             >
               {{ primaryFile.format ?? '?' }}
-            </button>
+            </RouterLink>
           </TooltipTrigger>
           <TooltipContent>{{ t('book.actions.openAs', { format: primaryFile.format?.toUpperCase() ?? t('book.unknownFormat') }) }}</TooltipContent>
         </Tooltip>
         <Tooltip v-for="file in uniqueSecondaryFiles" :key="file.id">
           <TooltipTrigger as-child>
-            <button
+            <RouterLink
+              :to="readerRoute(file)"
               class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground hover:bg-muted/70 transition-colors"
-              @click="openFile(file)"
             >
               {{ file.format ?? '?' }}
-            </button>
+            </RouterLink>
           </TooltipTrigger>
           <TooltipContent>{{ t('book.actions.openAs', { format: file.format?.toUpperCase() ?? t('book.unknownFormat') }) }}</TooltipContent>
         </Tooltip>
@@ -410,9 +427,11 @@ function handleRowClick(event: MouseEvent) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem :disabled="!primaryFile || isMissing" @click="primaryFile && !isMissing && openFile(primaryFile)">
-            <BookOpen class="size-4 mr-2" />
-            {{ t('book.actions.read') }}
+          <DropdownMenuItem v-if="primaryFile && !isMissing" as-child>
+            <RouterLink :to="readerRoute(primaryFile)">
+              <BookOpen class="size-4 mr-2" />
+              {{ t('book.actions.read') }}
+            </RouterLink>
           </DropdownMenuItem>
           <DropdownMenuItem :disabled="!primaryFile || isMissing" @click="peekPrimaryFile">
             <Eye class="size-4 mr-2" />
@@ -422,17 +441,18 @@ function handleRowClick(event: MouseEvent) {
             <PanelRight class="size-4 mr-2" />
             {{ t('book.actions.quickView') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="openBookDetails">
-            <ExternalLink class="size-4 mr-2" />
-            {{ t('book.actions.bookDetails') }}
+          <DropdownMenuItem as-child>
+            <RouterLink :to="bookDetailRoute">
+              <ExternalLink class="size-4 mr-2" />
+              {{ t('book.actions.bookDetails') }}
+            </RouterLink>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            v-if="hasPermission('library_edit_metadata')"
-            @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })"
-          >
-            <Pencil class="size-4 mr-2" />
-            {{ t('book.actions.editMetadata') }}
+          <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" as-child>
+            <RouterLink :to="{ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } }">
+              <Pencil class="size-4 mr-2" />
+              {{ t('book.actions.editMetadata') }}
+            </RouterLink>
           </DropdownMenuItem>
           <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="refreshing" @click="refreshWithFeedback(book.id)">
             <Loader2 v-if="refreshing" class="size-4 mr-2 animate-spin" />

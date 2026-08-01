@@ -125,12 +125,16 @@ function formatRelative(iso: string): string {
   return t('book.detail.files.relative.days', { value: d })
 }
 
-function openFile(file: BookDetailFile, mode?: 'peek') {
-  router.push({
+function readerRoute(file: BookDetailFile) {
+  return {
     name: 'reader',
     params: { bookId: props.book.id, fileId: file.id },
-    query: mode === 'peek' ? { format: file.format ?? 'epub', mode } : { format: file.format ?? 'epub' },
-  })
+    query: { format: file.format ?? 'epub' },
+  }
+}
+
+function peekFile(file: BookDetailFile) {
+  router.push({ ...readerRoute(file), query: { format: file.format ?? 'epub', mode: 'peek' } })
 }
 
 function downloadFile(file: BookDetailFile) {
@@ -409,22 +413,22 @@ async function toggleWriteLog() {
           >
 
           <div class="hidden items-center gap-1.5 md:flex">
-            <button
+            <RouterLink
               v-if="READER_OPENABLE_FORMATS.has(file.format ?? '') && !isAudioFile(file)"
+              :to="readerRoute(file)"
               class="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-              @click="openFile(file)"
             >
               <BookOpen class="size-3.5" />
               {{ t('book.detail.files.read') }}
-            </button>
-            <button
+            </RouterLink>
+            <RouterLink
               v-if="isAudioFile(file)"
+              :to="readerRoute(file)"
               class="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-              @click="openFile(file)"
             >
               <Headphones class="size-3.5" />
               {{ t('book.detail.files.play') }}
-            </button>
+            </RouterLink>
             <Tooltip v-if="hasPermission('library_download')">
               <TooltipTrigger as-child>
                 <button
@@ -448,15 +452,19 @@ async function toggleWriteLog() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem v-if="READER_OPENABLE_FORMATS.has(file.format ?? '') && !isAudioFile(file)" class="md:hidden" @click="openFile(file)">
-                <BookOpen class="mr-2 size-4" />
-                {{ t('book.detail.files.read') }}
+              <DropdownMenuItem v-if="READER_OPENABLE_FORMATS.has(file.format ?? '') && !isAudioFile(file)" class="md:hidden" as-child>
+                <RouterLink :to="readerRoute(file)">
+                  <BookOpen class="mr-2 size-4" />
+                  {{ t('book.detail.files.read') }}
+                </RouterLink>
               </DropdownMenuItem>
-              <DropdownMenuItem v-if="isAudioFile(file)" class="md:hidden" @click="openFile(file)">
-                <Headphones class="mr-2 size-4" />
-                {{ t('book.detail.files.play') }}
+              <DropdownMenuItem v-if="isAudioFile(file)" class="md:hidden" as-child>
+                <RouterLink :to="readerRoute(file)">
+                  <Headphones class="mr-2 size-4" />
+                  {{ t('book.detail.files.play') }}
+                </RouterLink>
               </DropdownMenuItem>
-              <DropdownMenuItem v-if="READER_OPENABLE_FORMATS.has(file.format ?? '')" @click="openFile(file, 'peek')">
+              <DropdownMenuItem v-if="READER_OPENABLE_FORMATS.has(file.format ?? '')" @click="peekFile(file)">
                 <Eye class="mr-2 size-4" />
                 {{ t('book.detail.files.peek') }}
               </DropdownMenuItem>

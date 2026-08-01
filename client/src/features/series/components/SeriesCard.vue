@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { formatNumber } from '@/i18n/formatters'
 import type { SeriesSummary } from '@bookorbit/types'
 import { BookCopy } from '@lucide/vue'
@@ -22,10 +23,7 @@ const SQUARE_COVER_SCALE = 1.25
 
 const props = defineProps<{
   series: SeriesSummary
-}>()
-
-const emit = defineEmits<{
-  open: [seriesId: number]
+  to: RouteLocationRaw
 }>()
 
 const { coverUrl } = useCoverVersions()
@@ -58,10 +56,6 @@ function handleCoverLoad(bookId: number, ratio: number | null) {
   const prev = coverRatios.value.get(bookId)
   if (!shouldPersistCoverRatio(prev, ratio)) return
   coverRatios.value = new Map(coverRatios.value).set(bookId, ratio)
-}
-
-function handleClick() {
-  emit('open', props.series.id)
 }
 
 function handleCoverHover(bookId: number) {
@@ -121,7 +115,7 @@ const coverStyles = computed(() => {
 </script>
 
 <template>
-  <div class="group flex h-full cursor-pointer flex-col" @click="handleClick">
+  <RouterLink :to="to" :aria-label="series.name" class="group flex h-full flex-col">
     <div
       class="flex h-full flex-col overflow-hidden rounded-lg border border-border/60 bg-card shadow-sm transition-all duration-200 hover:border-border hover:shadow-md"
     >
@@ -180,5 +174,5 @@ const coverStyles = computed(() => {
 
       <SeriesCompletionBar :read-count="series.readCount" :total-count="series.bookCount" compact flush class="mt-auto" />
     </div>
-  </div>
+  </RouterLink>
 </template>

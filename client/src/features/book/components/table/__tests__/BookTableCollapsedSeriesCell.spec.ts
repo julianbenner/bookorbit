@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
+import { defineComponent } from 'vue'
 import type { BookCard } from '@bookorbit/types'
 import BookTableCollapsedSeriesCell from '../BookTableCollapsedSeriesCell.vue'
 
@@ -20,6 +21,7 @@ function makeBook(format: string | null): BookCard {
     title: 'Saga',
     authors: [],
     seriesName: 'Saga',
+    seriesId: 42,
     seriesIndex: null,
     files: format ? [{ id: 1, format, role: 'primary', sizeBytes: null }] : [],
     publishedDate: null,
@@ -57,11 +59,16 @@ const CoverSurfaceStub = {
   props: ['isComic', 'disableSpine'],
   template: '<div data-testid="surface" :data-comic="isComic"><slot /></div>',
 }
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: { to: { type: [String, Object], required: true } },
+  template: '<a><slot /></a>',
+})
 
 function mountCell(format: string | null) {
   return mount(BookTableCollapsedSeriesCell, {
     props: { book: makeBook(format), colId: 'cover' as never },
-    global: { stubs: { BookCoverSurface: CoverSurfaceStub } },
+    global: { stubs: { BookCoverSurface: CoverSurfaceStub, RouterLink: RouterLinkStub } },
   })
 }
 

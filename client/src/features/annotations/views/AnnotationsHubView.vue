@@ -122,22 +122,6 @@ async function handleBulkRestyle(style: string) {
   const affected = await hub.bulk('restyle', { style })
   if (affected > 0) toast.success(t('annotations.hub.toast.bulkRestyled', { count: affected }))
 }
-
-function handleExport(format: 'md' | 'csv' | 'json') {
-  window.open(hub.exportUrl(format), '_blank')
-}
-
-function handleExportMarkdown() {
-  handleExport('md')
-}
-
-function handleExportCsv() {
-  handleExport('csv')
-}
-
-function handleExportJson() {
-  handleExport('json')
-}
 </script>
 
 <template>
@@ -167,9 +151,15 @@ function handleExportJson() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem @click="handleExportMarkdown">{{ t('annotations.hub.exportMarkdown') }}</DropdownMenuItem>
-            <DropdownMenuItem @click="handleExportCsv">{{ t('annotations.hub.exportCsv') }}</DropdownMenuItem>
-            <DropdownMenuItem @click="handleExportJson">{{ t('annotations.hub.exportJson') }}</DropdownMenuItem>
+            <DropdownMenuItem as-child>
+              <a :href="hub.exportUrl('md')" target="_blank" rel="noopener noreferrer">{{ t('annotations.hub.exportMarkdown') }}</a>
+            </DropdownMenuItem>
+            <DropdownMenuItem as-child>
+              <a :href="hub.exportUrl('csv')" target="_blank" rel="noopener noreferrer">{{ t('annotations.hub.exportCsv') }}</a>
+            </DropdownMenuItem>
+            <DropdownMenuItem as-child>
+              <a :href="hub.exportUrl('json')" target="_blank" rel="noopener noreferrer">{{ t('annotations.hub.exportJson') }}</a>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

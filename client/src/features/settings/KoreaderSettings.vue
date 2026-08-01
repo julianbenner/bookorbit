@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import {
   AlertTriangle,
@@ -57,21 +57,6 @@ if (route && router) {
       activeTab.value = normalizeTab(value)
     },
   )
-}
-
-function selectTab(tab: Tab): void {
-  activeTab.value = tab
-  if (route && router) {
-    void router.replace({ name: 'settings-koreader', query: { ...route.query, tab } })
-  }
-}
-
-function showSettingsTab(): void {
-  selectTab('settings')
-}
-
-function showFileNamingTab(): void {
-  selectTab('file-naming')
 }
 
 const {
@@ -592,34 +577,36 @@ async function handleDownloadPlugin() {
     :subtitle="t('settings.reader.koreader.subtitle')"
   />
   <div v-if="!props.embedded" class="mb-5 flex border-b border-border" role="group" :aria-label="t('settings.reader.koreader.title')">
-    <button
+    <RouterLink
       id="koreader-sync-tab"
+      :to="{ name: 'settings-koreader', query: { ...(route?.query ?? {}), tab: 'settings' } }"
+      replace
       class="px-4 py-2 text-sm border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       :class="
         activeTab === 'settings'
           ? 'border-primary text-foreground font-semibold'
           : 'border-transparent text-muted-foreground hover:text-foreground font-medium'
       "
-      :aria-pressed="activeTab === 'settings'"
+      :aria-current="activeTab === 'settings' ? 'page' : undefined"
       aria-controls="koreader-sync-panel"
-      @click="showSettingsTab"
     >
       {{ t('settings.reader.koreader.tabs.sync') }}
-    </button>
-    <button
+    </RouterLink>
+    <RouterLink
       id="koreader-file-naming-tab"
+      :to="{ name: 'settings-koreader', query: { ...(route?.query ?? {}), tab: 'file-naming' } }"
+      replace
       class="px-4 py-2 text-sm border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       :class="
         activeTab === 'file-naming'
           ? 'border-primary text-foreground font-semibold'
           : 'border-transparent text-muted-foreground hover:text-foreground font-medium'
       "
-      :aria-pressed="activeTab === 'file-naming'"
+      :aria-current="activeTab === 'file-naming' ? 'page' : undefined"
       aria-controls="koreader-file-naming-panel"
-      @click="showFileNamingTab"
     >
       {{ t('settings.reader.koreader.tabs.fileNaming') }}
-    </button>
+    </RouterLink>
   </div>
 
   <div v-if="!props.embedded" class="md:hidden px-1">

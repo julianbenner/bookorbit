@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { Loader2, AlertCircle } from '@lucide/vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
 
@@ -34,10 +34,6 @@ onMounted(async () => {
     errorMessage.value = e instanceof Error ? e.message : t('auth.magicLink.loginFailed')
   }
 })
-
-function goToLogin() {
-  router.push('/login')
-}
 </script>
 
 <template>
@@ -56,12 +52,12 @@ function goToLogin() {
           <p class="text-base font-semibold text-foreground">{{ t('auth.magicLink.loginFailed') }}</p>
           <p class="mt-1 text-sm text-muted-foreground">{{ errorMessage }}</p>
         </div>
-        <button
-          class="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-          @click="goToLogin"
+        <RouterLink
+          to="/login"
+          class="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
         >
           {{ t('auth.magicLink.goToLogin') }}
-        </button>
+        </RouterLink>
       </div>
     </div>
   </div>

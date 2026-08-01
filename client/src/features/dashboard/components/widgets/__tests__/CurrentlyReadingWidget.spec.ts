@@ -1,5 +1,6 @@
-import { flushPromises, mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
+import { defineComponent } from 'vue'
+import { flushPromises, mount } from '@vue/test-utils'
 import type { CurrentlyReadingWidgetData } from '@bookorbit/types'
 import CurrentlyReadingWidget from '../CurrentlyReadingWidget.vue'
 
@@ -8,10 +9,20 @@ const fetchCurrentlyReading = vi.fn<() => Promise<CurrentlyReadingWidgetData>>()
 vi.mock('@/features/dashboard/api/dashboard-widget.api', () => ({
   fetchCurrentlyReading: () => fetchCurrentlyReading(),
 }))
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn<(...args: unknown[]) => void>() }) }))
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
   useCoverVersions: () => ({ coverUrl: () => '/cover.jpg' }),
 }))
+
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: {
+    to: {
+      type: [String, Object],
+      required: true,
+    },
+  },
+  template: '<a><slot /></a>',
+})
 
 const CoverSurfaceStub = {
   name: 'BookCoverSurface',
@@ -31,7 +42,13 @@ function book(fileFormat: string | null) {
 function mountWidget(fileFormat: string | null) {
   fetchCurrentlyReading.mockResolvedValue({ books: [book(fileFormat)] })
   return mount(CurrentlyReadingWidget, {
-    global: { stubs: { BookCoverSurface: CoverSurfaceStub, BookCoverArtwork: CoverArtworkStub } },
+    global: {
+      stubs: {
+        BookCoverSurface: CoverSurfaceStub,
+        BookCoverArtwork: CoverArtworkStub,
+        RouterLink: RouterLinkStub,
+      },
+    },
   })
 }
 
@@ -42,6 +59,21 @@ describe('CurrentlyReadingWidget comic spine flag', () => {
 
     expect(wrapper.find('[data-testid="surface"]').attributes('data-comic')).toBe('true')
     expect(wrapper.find('[data-testid="artwork"]').attributes('data-comic')).toBe('true')
+  })
+
+  it('links book details and the reader to their route targets', async () => {
+    const wrapper = mountWidget('epub')
+    await flushPromises()
+
+    const links = wrapper.findAllComponents(RouterLinkStub)
+    expect(links).toHaveLength(3)
+    expect(links[0]!.props('to')).toEqual({ name: 'book-detail', params: { bookId: 1 } })
+    expect(links[1]!.props('to')).toEqual({ name: 'book-detail', params: { bookId: 1 } })
+    expect(links[2]!.props('to')).toEqual({
+      name: 'reader',
+      params: { bookId: 1, fileId: 9 },
+      query: { format: 'epub' },
+    })
   })
 
   it('does not mark non-comic books as comics', async () => {

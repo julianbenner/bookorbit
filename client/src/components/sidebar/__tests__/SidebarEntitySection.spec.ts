@@ -127,6 +127,22 @@ describe('SidebarEntitySection', () => {
       expect(wrapper.text()).not.toContain('See all collections')
     })
 
+    it('renders the index route and only emits navigation for an unmodified primary click', async () => {
+      const wrapper = mountSection(9)
+      const link = wrapper.findAllComponents({ name: 'RouterLink' }).find((item) => item.text().includes('See all collections'))
+
+      expect(link).toBeDefined()
+      if (!link) throw new Error('Expected see-all link')
+      expect(link.props('to')).toEqual({ name: 'collections' })
+
+      await link.trigger('click', { button: 1 })
+      await link.trigger('click', { button: 0, metaKey: true })
+      expect(wrapper.emitted('navigate')).toBeUndefined()
+
+      await link.trigger('click')
+      expect(wrapper.emitted('navigate')).toEqual([[]])
+    })
+
     it('appears once the total exceeds the cap', () => {
       const wrapper = mountSection(9)
 

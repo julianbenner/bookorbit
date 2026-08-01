@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { mount } from '@vue/test-utils'
 import { defineComponent, h, ref } from 'vue'
 import type { BookCard } from '@bookorbit/types'
 import BookCoverCard from './BookCoverCard.vue'
@@ -11,6 +11,17 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ fullPath: '/' }),
   useRouter: () => ({ push: mockRouterPush }),
 }))
+
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: {
+    to: {
+      type: [String, Object],
+      required: true,
+    },
+  },
+  template: '<a><slot /></a>',
+})
 
 const mockCoverUrl = vi.fn<(id: number, type?: 'thumbnail' | 'cover', sourceVersion?: string | number | Date | null) => string>(
   (id: number) => `/api/covers/${id}`,
@@ -38,20 +49,6 @@ vi.mock('@/features/book/lib/book-card-mapper', () => ({
 const mockHasPermission = vi.fn<() => boolean>().mockReturnValue(true)
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: mockHasPermission }),
-}))
-
-const mockFetchAuthors = vi.hoisted(() =>
-  vi.fn<
-    (params: { q?: string; page: number; size: number; sort: string; order: string }) => Promise<{
-      items: Array<{ id: number; name: string; sortName: string | null; bookCount: number; lastAddedAt: string | null }>
-      total: number
-      page: number
-      size: number
-    }>
-  >(),
-)
-vi.mock('@/features/author/api/author', () => ({
-  fetchAuthors: mockFetchAuthors,
 }))
 
 const mockCardOverlays = ref<string[]>([])
@@ -175,6 +172,7 @@ function mountCard(
     props: { book: makeBook(), selectionMode: false, selected: false, ...props },
     global: {
       stubs: {
+        RouterLink: RouterLinkStub,
         DropdownMenu: { template: '<div data-testid="dropdown-menu"><slot /></div>' },
         DropdownMenuTrigger: { template: '<div data-testid="dropdown-trigger"><slot /></div>' },
         DropdownMenuContent: { template: '<div data-testid="dropdown-content"><slot /></div>' },
@@ -225,12 +223,6 @@ describe('BookCoverCard', () => {
     mockGridCardSecondaryLabel.value = 'hidden'
     mockCardInfoMode.value = 'hover-overlay'
     mockThumbnailClickAction.value = 'reader'
-    mockFetchAuthors.mockResolvedValue({
-      items: [{ id: 7, name: 'Frank Herbert', sortName: null, bookCount: 1, lastAddedAt: '2024-01-01T00:00:00Z' }],
-      total: 1,
-      page: 0,
-      size: 5,
-    })
     setTouchMode(false)
   })
 
@@ -298,51 +290,49 @@ describe('BookCoverCard', () => {
   // ── card click: desktop vs mobile ────────────────────────────────────────
 
   describe('card click behavior', () => {
-    it('opens primary file on desktop click when primaryFile exists', async () => {
-      setTouchMode(false)
+    it('renders the primary reader link when the thumbnail action is reader', () => {
       const book = makeBook({ files: [makeFile({ id: 10, format: 'epub', role: 'primary' })] })
       const wrapper = mountCard({ book })
-      await wrapper.find('.group').trigger('click')
-      expect(mockRouterPush).toHaveBeenCalledWith(expect.objectContaining({ name: 'reader', params: { bookId: 1, fileId: 10 } }))
+      const routes = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'))
+
+      expect(routes).toContainEqual({
+        name: 'reader',
+        params: { bookId: 1, fileId: 10 },
+        query: { format: 'epub' },
+      })
     })
 
-    it('opens book details on desktop click when thumbnail clicks prefer details', async () => {
-      setTouchMode(false)
+    it('renders the book detail link when thumbnail clicks prefer details', () => {
       mockThumbnailClickAction.value = 'details'
       const book = makeBook({ id: 42, files: [makeFile({ id: 10, format: 'epub', role: 'primary' })] })
       const wrapper = mountCard({ book })
+      const routes = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'))
 
-      await wrapper.find('.group').trigger('click')
-
-      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 42 } })
-      expect(mockRouterPush).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
+      expect(routes).toContainEqual({ name: 'book-detail', params: { bookId: 42 } })
+      expect(routes).toContainEqual(expect.objectContaining({ name: 'reader' }))
     })
 
-    it('opens book details for missing books when thumbnail clicks prefer details', async () => {
-      setTouchMode(false)
+    it('renders the book detail link for missing books when details are preferred', () => {
       mockThumbnailClickAction.value = 'details'
       const book = makeBook({ id: 43, status: 'missing', files: [] })
       const wrapper = mountCard({ book })
+      const routes = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'))
 
-      await wrapper.find('.group').trigger('click')
-
-      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 43 } })
+      expect(routes).toContainEqual({ name: 'book-detail', params: { bookId: 43 } })
     })
 
-    it('does nothing on desktop click when no readable primary file exists', async () => {
-      setTouchMode(false)
-      const book = makeBook({ files: [] })
-      const wrapper = mountCard({ book })
-      await wrapper.find('.group').trigger('click')
-      expect(mockRouterPush).not.toHaveBeenCalled()
+    it('does not render a primary navigation link when no readable primary file exists', () => {
+      const wrapper = mountCard({ book: makeBook({ files: [] }) })
+      const routes = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'))
+
+      expect(routes).not.toContainEqual(expect.objectContaining({ name: 'reader' }))
+      expect(wrapper.find('[data-testid="grid-card-primary-action"]').exists()).toBe(false)
     })
 
     it('does not open file when clicking a button (event target is button)', async () => {
       setTouchMode(false)
       const wrapper = mountCard()
-      const btn = wrapper.find('button')
-      await btn.trigger('click')
-      // The card click handler returns early for button clicks
+      await wrapper.find('button').trigger('click')
       expect(mockRouterPush).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
     })
 
@@ -363,12 +353,13 @@ describe('BookCoverCard', () => {
       expect(overlay.classes()).toContain('opacity-0')
     })
 
-    it('emits select and does not open file in selection mode', async () => {
+    it('emits select and does not render navigation links in selection mode', async () => {
       mockThumbnailClickAction.value = 'details'
       const mockSelect = vi.fn<(e: MouseEvent) => void>()
       const wrapper = mountCard({ selectionMode: true, onSelect: mockSelect })
       await wrapper.find('.group').trigger('click')
       expect(mockSelect).toHaveBeenCalled()
+      expect(wrapper.findAllComponents(RouterLinkStub)).toHaveLength(0)
       expect(mockRouterPush).not.toHaveBeenCalled()
     })
 
@@ -380,48 +371,42 @@ describe('BookCoverCard', () => {
       expect(mockRouterPush).not.toHaveBeenCalled()
     })
 
-    it('keeps the explicit read button opening the reader when thumbnail clicks prefer details', async () => {
-      setTouchMode(false)
+    it('renders both detail and explicit reader links when thumbnail clicks prefer details', () => {
       mockThumbnailClickAction.value = 'details'
       const book = makeBook({ id: 44, files: [makeFile({ id: 12, format: 'epub', role: 'primary' })] })
       const wrapper = mountCard({ book })
+      const routes = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'))
 
-      const overlayButtons = wrapper.find('.bg-black\\/70').findAll('button')
-      await overlayButtons[1]!.trigger('click')
-
-      expect(mockRouterPush).toHaveBeenCalledWith(expect.objectContaining({ name: 'reader', params: { bookId: 44, fileId: 12 } }))
-      expect(mockRouterPush).not.toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 44 } })
+      expect(routes).toContainEqual({ name: 'book-detail', params: { bookId: 44 } })
+      expect(routes).toContainEqual({
+        name: 'reader',
+        params: { bookId: 44, fileId: 12 },
+        query: { format: 'epub' },
+      })
     })
   })
 
-  describe('below-cover label click behavior', () => {
-    it('opens book details when the primary label text is clicked', async () => {
+  describe('below-cover label link targets', () => {
+    it('links the primary book label to book details', () => {
       mockCardInfoMode.value = 'below-cover'
       mockGridCardPrimaryLabel.value = 'book-title'
       const book = makeBook({ id: 42, files: [makeFile({ id: 10, format: 'epub', role: 'primary' })] })
       const wrapper = mountCard({ book, showLabel: true })
+      const label = wrapper.findAllComponents(RouterLinkStub).find((link) => link.text().trim() === 'Dune')
 
-      await wrapper.get('[data-testid="grid-card-label-primary"]').trigger('click')
-
-      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 42 } })
-      expect(mockRouterPush).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
+      expect(label?.props('to')).toEqual({ name: 'book-detail', params: { bookId: 42 } })
     })
 
-    it('opens author details when the author label text is clicked', async () => {
+    it('links the author label to the authors search page', () => {
       mockCardInfoMode.value = 'below-cover'
       mockGridCardSecondaryLabel.value = 'author'
-      const book = makeBook({ id: 43, files: [makeFile({ id: 11, format: 'epub', role: 'primary' })] })
-      const wrapper = mountCard({ book, showLabel: true })
+      const wrapper = mountCard({ book: makeBook({ id: 43 }), showLabel: true })
+      const label = wrapper.findAllComponents(RouterLinkStub).find((link) => link.text().trim() === 'Frank Herbert')
 
-      await wrapper.get('[data-testid="grid-card-label-secondary"]').trigger('click')
-      await flushPromises()
-
-      expect(mockFetchAuthors).toHaveBeenCalledWith({ q: 'Frank Herbert', page: 0, size: 5, sort: 'name', order: 'asc' })
-      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'author-detail', params: { id: 7 }, query: { from: '/' } })
-      expect(mockRouterPush).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
+      expect(label?.props('to')).toEqual({ name: 'authors', query: { q: 'Frank Herbert' } })
     })
 
-    it('opens series details when the series label text is clicked', async () => {
+    it('links the series label to the series detail route with the current path', () => {
       mockCardInfoMode.value = 'below-cover'
       mockGridCardPrimaryLabel.value = 'series-title-position'
       const book = makeBook({
@@ -432,11 +417,9 @@ describe('BookCoverCard', () => {
         files: [makeFile({ id: 12, format: 'epub', role: 'primary' })],
       })
       const wrapper = mountCard({ book, showLabel: true })
+      const label = wrapper.findAllComponents(RouterLinkStub).find((link) => link.text().trim() === 'Dune Chronicles #1')
 
-      await wrapper.get('[data-testid="grid-card-label-primary"]').trigger('click')
-
-      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'series-detail', params: { seriesId: 42 }, query: { from: '/' } })
-      expect(mockRouterPush).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
+      expect(label?.props('to')).toEqual({ name: 'series-detail', params: { seriesId: 42 }, query: { from: '/' } })
     })
   })
 
@@ -535,13 +518,11 @@ describe('BookCoverCard', () => {
   // ── author browse navigation ──────────────────────────────────────────────
 
   describe('author browse', () => {
-    it('navigates to authors page when author button clicked', async () => {
-      const book = makeBook({ hasCover: false, authors: ['Frank Herbert'] })
-      const wrapper = mountCard({ book })
-      const authorBtn = wrapper.findAll('.bg-black\\/70 button').find((b) => b.text().includes('Frank Herbert'))
-      expect(authorBtn).toBeDefined()
-      await authorBtn!.trigger('click')
-      expect(mockRouterPush).toHaveBeenCalledWith({ name: 'authors', query: { q: 'Frank Herbert' } })
+    it('renders an authors link in the hover overlay', () => {
+      const wrapper = mountCard({ book: makeBook({ hasCover: false, authors: ['Frank Herbert'] }) })
+      const authorLink = wrapper.findAllComponents(RouterLinkStub).find((link) => link.text().includes('Frank Herbert'))
+
+      expect(authorLink?.props('to')).toEqual({ name: 'authors', query: { q: 'Frank Herbert' } })
     })
 
     it('does not navigate when authors array is empty', async () => {

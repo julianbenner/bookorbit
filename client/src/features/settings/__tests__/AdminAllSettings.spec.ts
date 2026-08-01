@@ -15,6 +15,11 @@ const routerState = {
 }
 
 vi.mock('vue-router', () => ({
+  RouterLink: {
+    name: 'RouterLink',
+    props: { to: { type: [String, Object, Array], required: true }, replace: Boolean },
+    template: '<a><slot /></a>',
+  },
   useRoute: () => ({ query: routerState.currentQuery }),
   useRouter: () => ({
     replace: vi.fn<(to: { name: string; query: Record<string, string> }) => void>((to) => {
@@ -61,7 +66,7 @@ describe('AdminAllSettings', () => {
   describe('superuser', () => {
     it('sees Users, Account Activity, Magic Links, and OIDC tabs', () => {
       const wrapper = mountComponent(undefined, { su: true })
-      const labels = wrapper.findAll('button').map((b) => b.text())
+      const labels = wrapper.findAll('a').map((link) => link.text())
       expect(labels).toContain('Users')
       expect(labels).toContain('Account Activity')
       expect(labels).toContain('Magic Links')
@@ -103,7 +108,7 @@ describe('AdminAllSettings', () => {
   describe('user with manage_users only', () => {
     it('sees only Users tab', () => {
       const wrapper = mountComponent(undefined, { perms: ['manage_users'] })
-      const labels = wrapper.findAll('button').map((b) => b.text())
+      const labels = wrapper.findAll('a').map((link) => link.text())
       expect(labels).toContain('Users')
       expect(labels).not.toContain('Magic Links')
       expect(labels).not.toContain('OIDC / SSO')
@@ -125,7 +130,7 @@ describe('AdminAllSettings', () => {
   describe('user with view_user_activity only', () => {
     it('sees and defaults to only the Account Activity tab', () => {
       const wrapper = mountComponent(undefined, { perms: ['view_user_activity'] })
-      const labels = wrapper.findAll('button').map((button) => button.text())
+      const labels = wrapper.findAll('a').map((link) => link.text())
 
       expect(labels).toEqual(['Account Activity'])
       expect(wrapper.find('[data-testid="account-activity-page"]').exists()).toBe(true)
@@ -136,7 +141,7 @@ describe('AdminAllSettings', () => {
   describe('user with manage_app_settings only', () => {
     it('sees only OIDC tab', () => {
       const wrapper = mountComponent(undefined, { perms: ['manage_app_settings'] })
-      const labels = wrapper.findAll('button').map((b) => b.text())
+      const labels = wrapper.findAll('a').map((link) => link.text())
       expect(labels).not.toContain('Users')
       expect(labels).toContain('OIDC / SSO')
     })
@@ -150,7 +155,7 @@ describe('AdminAllSettings', () => {
   describe('user with both manage_users and manage_app_settings', () => {
     it('sees both tabs', () => {
       const wrapper = mountComponent(undefined, { perms: ['manage_users', 'manage_app_settings'] })
-      const labels = wrapper.findAll('button').map((b) => b.text())
+      const labels = wrapper.findAll('a').map((link) => link.text())
       expect(labels).toContain('Users')
       expect(labels).not.toContain('Magic Links')
       expect(labels).toContain('OIDC / SSO')
@@ -158,27 +163,25 @@ describe('AdminAllSettings', () => {
   })
 
   describe('tab navigation', () => {
-    it('active tab button has border-primary class', () => {
+    it('active tab link has border-primary class', () => {
       const wrapper = mountComponent('users', { su: true })
-      const usersBtn = wrapper.findAll('button').find((b) => b.text() === 'Users')
-      expect(usersBtn?.classes()).toContain('border-primary')
+      const usersLink = wrapper.findAll('a').find((link) => link.text() === 'Users')
+      expect(usersLink?.classes()).toContain('border-primary')
     })
 
-    it('inactive tab button has border-transparent class', () => {
+    it('inactive tab link has border-transparent class', () => {
       const wrapper = mountComponent('users', { su: true })
-      const oidcBtn = wrapper.findAll('button').find((b) => b.text() === 'OIDC / SSO')
-      expect(oidcBtn?.classes()).toContain('border-transparent')
+      const oidcLink = wrapper.findAll('a').find((link) => link.text() === 'OIDC / SSO')
+      expect(oidcLink?.classes()).toContain('border-transparent')
     })
 
-    it('clicking a tab switches content', async () => {
-      permState.isSuperuser = true
-      routerState.currentQuery = { tab: 'users' }
-      const wrapper = mount(AdminAllSettings)
+    it('renders the OIDC tab route target', () => {
+      const wrapper = mountComponent('users', { su: true })
+      const oidcLink = wrapper.findAllComponents({ name: 'RouterLink' }).find((link) => link.text() === 'OIDC / SSO')
 
-      const oidcBtn = wrapper.findAll('button').find((b) => b.text() === 'OIDC / SSO')
-      await oidcBtn!.trigger('click')
-
-      expect(wrapper.find('[data-testid="oidc-settings"]').exists()).toBe(true)
+      expect(oidcLink).toBeDefined()
+      expect(oidcLink?.props('to')).toEqual({ name: 'settings-admin', query: { tab: 'oidc' } })
+      expect(oidcLink?.props('replace')).toBe(true)
     })
 
     it('replaces URL with default tab when no tab param present', () => {

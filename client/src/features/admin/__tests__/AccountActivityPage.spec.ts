@@ -11,6 +11,7 @@ const tooltipStubs = {
   Tooltip: { template: '<div><slot /></div>' },
   TooltipTrigger: { template: '<div><slot /></div>' },
   TooltipContent: { template: '<div><slot /></div>' },
+  RouterLink: { name: 'RouterLink', props: ['to'], template: '<a><slot /></a>' },
 }
 
 function mountPage() {
@@ -75,10 +76,15 @@ describe('AccountActivityPage', () => {
     expect(wrapper.text()).toContain('Reader')
     expect(wrapper.text()).toContain('No recorded activity')
     expect(wrapper.text()).not.toContain('Details')
-    const insightsButton = wrapper.find('button[aria-label="Open shared reading insights for Maya"]')
-    expect(insightsButton.exists()).toBe(true)
-    expect(insightsButton.classes()).toContain('bg-primary/10')
-    expect(wrapper.find('nav').exists()).toBe(false)
+    const insightsLink = wrapper.find('a[aria-label="Open shared reading insights for Maya"]')
+    expect(insightsLink.exists()).toBe(true)
+    expect(insightsLink.classes()).toContain('bg-primary/10')
+    const routeLink = wrapper.findAllComponents({ name: 'RouterLink' }).find((link) => {
+      const target = link.props('to') as { params?: { userId?: number } } | undefined
+      return target?.params?.userId === 2
+    })
+    expect(routeLink).toBeDefined()
+    expect(routeLink?.props('to')).toEqual({ name: 'settings-admin-shared-insights', params: { userId: 2 } })
     expect(wrapper.find('table').classes()).toContain('table-fixed')
   })
 

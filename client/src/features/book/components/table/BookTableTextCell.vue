@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
-import { ExternalLink } from '@lucide/vue'
 
 const props = defineProps<{
   value: string | null
@@ -11,7 +9,6 @@ const props = defineProps<{
   searchFn?: (q: string) => Promise<string[]>
   openLink?: string | null
   openLinkLabel?: string | null
-  alwaysShowOpenLinkIcon?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -20,8 +17,6 @@ const emit = defineEmits<{
   cancel: []
   navigate: [direction: 'next' | 'prev' | 'rowUp' | 'rowDown']
 }>()
-
-const { t } = useI18n()
 
 const inputRef = ref<HTMLInputElement | null>(null)
 const draft = ref<string>(props.value ?? '')
@@ -222,14 +217,19 @@ function handleClick() {
         </button>
       </div>
     </Teleport>
-    <div v-if="!isActive" class="group/text-cell relative w-full min-w-0">
+    <div v-if="!isActive" class="relative w-full min-w-0">
+      <RouterLink
+        v-if="openLink"
+        :to="openLink"
+        class="block min-h-[20px] min-w-0 truncate rounded px-1 text-sm text-foreground hover:bg-primary/5 hover:underline"
+        :title="openLinkLabel ?? value ?? ''"
+      >
+        {{ value || '-' }}
+      </RouterLink>
       <span
+        v-else
         class="block min-h-[20px] min-w-0 truncate rounded px-1 text-sm transition-[padding-right] duration-150"
-        :class="[
-          isReadOnly ? 'text-foreground' : 'cursor-pointer hover:bg-primary/5',
-          value ? 'text-foreground' : 'text-muted-foreground',
-          openLink ? 'pr-1 group-hover/text-cell:pr-6 group-focus-within/text-cell:pr-6' : 'pr-1',
-        ]"
+        :class="[isReadOnly ? 'text-foreground' : 'cursor-pointer hover:bg-primary/5', value ? 'text-foreground' : 'text-muted-foreground']"
         :title="value ?? ''"
         :tabindex="isReadOnly ? -1 : 0"
         :role="isReadOnly ? undefined : 'button'"
@@ -238,21 +238,6 @@ function handleClick() {
       >
         {{ value || '-' }}
       </span>
-      <RouterLink
-        v-if="openLink"
-        :to="openLink"
-        class="absolute right-0.5 top-1/2 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-opacity hover:bg-primary/10 hover:text-primary"
-        :class="
-          alwaysShowOpenLinkIcon
-            ? 'opacity-100'
-            : 'pointer-events-none opacity-0 group-hover/text-cell:pointer-events-auto group-hover/text-cell:opacity-100 group-focus-within/text-cell:pointer-events-auto group-focus-within/text-cell:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100'
-        "
-        :aria-label="openLinkLabel ?? t('book.table.text.openDetails')"
-        :title="openLinkLabel ?? t('book.table.text.openDetails')"
-        @click.stop
-      >
-        <ExternalLink :size="12" />
-      </RouterLink>
     </div>
   </div>
 </template>

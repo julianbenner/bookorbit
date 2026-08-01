@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
+import { defineComponent } from 'vue'
 import BookTableCoverCell from '../BookTableCoverCell.vue'
 
 vi.mock('../../../composables/useCoverVersions', () => ({
@@ -9,6 +10,11 @@ vi.mock('@/features/book/composables/useRefreshingBooks', () => ({
   useRefreshingBooks: () => ({ isRefreshing: () => false }),
 }))
 
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: { to: { type: [String, Object], required: true } },
+  template: '<a><slot /></a>',
+})
 const CoverSurfaceStub = {
   name: 'BookCoverSurface',
   props: ['isComic', 'disableSpine'],
@@ -24,7 +30,13 @@ function mountCell(props: { isAudio?: boolean; isComic?: boolean } = {}) {
   return mount(BookTableCoverCell, {
     props: { bookId: 1, title: 'Saga', hasCover: true, isAudio: props.isAudio ?? false, isComic: props.isComic ?? false },
     global: {
-      stubs: { BookCoverSurface: CoverSurfaceStub, BookCoverArtwork: CoverArtworkStub, BookCoverImage: true, Teleport: true },
+      stubs: {
+        RouterLink: RouterLinkStub,
+        BookCoverSurface: CoverSurfaceStub,
+        BookCoverArtwork: CoverArtworkStub,
+        BookCoverImage: true,
+        Teleport: true,
+      },
     },
   })
 }

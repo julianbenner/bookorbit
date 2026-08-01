@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Clock, Play } from '@lucide/vue'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { FORMAT_TO_GROUP } from '@bookorbit/types'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
@@ -12,31 +12,13 @@ import { useLongWaitWidget } from '../../composables/useLongWaitWidget'
 
 const { data, loading, error } = useLongWaitWidget()
 const { t } = useI18n()
-const router = useRouter()
+
 const { coverUrl } = useCoverVersions()
 
 const isComic = computed(() => {
   const format = data.value?.fileFormat
   return format != null && FORMAT_TO_GROUP[format] === 'cbx'
 })
-
-function goToBook() {
-  if (!data.value) return
-  void router.push({ name: 'book-detail', params: { bookId: data.value.bookId } })
-}
-
-function startReading() {
-  if (!data.value) return
-  if (data.value.fileId) {
-    void router.push({
-      name: 'reader',
-      params: { bookId: data.value.bookId, fileId: data.value.fileId },
-      query: { format: data.value.fileFormat ?? 'epub' },
-    })
-  } else {
-    goToBook()
-  }
-}
 </script>
 
 <template>
@@ -68,31 +50,33 @@ function startReading() {
     <!-- Long wait book -->
     <div v-else class="flex flex-1 flex-col">
       <div class="flex flex-1 items-center justify-center gap-4">
-        <BookCoverSurface
-          tag="button"
-          type="button"
-          size="mini"
-          class="book-cover-surface--spine-fitted h-24 w-18 shrink-0 cursor-pointer overflow-hidden rounded transition-opacity hover:opacity-80"
-          :is-comic="isComic"
-          @click="goToBook"
-        >
-          <BookCoverArtwork
-            :src="coverUrl(data.bookId)"
-            :has-cover="data.hasCover"
-            :title="data.title"
-            :author-line="null"
-            :is-audio="false"
-            :seed="data.title ?? String(data.bookId)"
-            :alt="data.title ?? t('dashboard.common.cover')"
-            frame-aspect-ratio="3/4"
+        <RouterLink :to="{ name: 'book-detail', params: { bookId: data.bookId } }" class="shrink-0">
+          <BookCoverSurface
+            size="mini"
+            class="book-cover-surface--spine-fitted h-24 w-18 cursor-pointer overflow-hidden rounded transition-opacity hover:opacity-80"
             :is-comic="isComic"
-          />
-        </BookCoverSurface>
+          >
+            <BookCoverArtwork
+              :src="coverUrl(data.bookId)"
+              :has-cover="data.hasCover"
+              :title="data.title"
+              :author-line="null"
+              :is-audio="false"
+              :seed="data.title ?? String(data.bookId)"
+              :alt="data.title ?? t('dashboard.common.cover')"
+              frame-aspect-ratio="3/4"
+              :is-comic="isComic"
+            />
+          </BookCoverSurface>
+        </RouterLink>
 
         <div class="min-w-0 text-left">
-          <button class="block cursor-pointer truncate text-xs font-semibold leading-tight hover:underline" @click="goToBook">
+          <RouterLink
+            :to="{ name: 'book-detail', params: { bookId: data.bookId } }"
+            class="block truncate text-xs font-semibold leading-tight hover:underline"
+          >
             {{ data.title ?? t('dashboard.common.untitled') }}
-          </button>
+          </RouterLink>
           <p class="mt-2 text-2xl font-bold leading-none tabular-nums text-primary">{{ data.waitingDays }}</p>
           <p class="text-[11px] text-muted-foreground">{{ t('dashboard.widgets.longWait.daysWaiting') }}</p>
 
@@ -105,13 +89,17 @@ function startReading() {
       </div>
 
       <!-- Start Reading CTA -->
-      <button
+      <RouterLink
+        :to="
+          data.fileId
+            ? { name: 'reader', params: { bookId: data.bookId, fileId: data.fileId }, query: { format: data.fileFormat ?? 'epub' } }
+            : { name: 'book-detail', params: { bookId: data.bookId } }
+        "
         class="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary/10 py-2 text-[12px] font-medium text-primary transition-colors hover:bg-primary/20"
-        @click="startReading"
       >
         <Play :size="12" class="translate-x-px" />
         {{ t('dashboard.widgets.longWait.startReading') }}
-      </button>
+      </RouterLink>
     </div>
   </div>
 </template>

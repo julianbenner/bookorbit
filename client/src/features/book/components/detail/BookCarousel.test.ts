@@ -6,11 +6,16 @@ import BookCarousel, { type CarouselBook } from './BookCarousel.vue'
 import { clearCoverLoadCache } from '@/features/book/lib/cover-load-cache'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
-const mockRouterPush = vi.fn<() => void>()
-
-vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: mockRouterPush }),
-}))
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: {
+    to: {
+      type: [String, Object],
+      required: true,
+    },
+  },
+  template: '<a><slot /></a>',
+})
 
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
   useCoverVersions: () => ({
@@ -68,7 +73,7 @@ function mountCarousel(
       showHeader: options.showHeader ?? true,
     },
     global: {
-      stubs: { ChevronLeft: true, ChevronRight: true },
+      stubs: { RouterLink: RouterLinkStub, ChevronLeft: true, ChevronRight: true },
     },
   })
 }
@@ -90,7 +95,6 @@ describe('BookCarousel', () => {
     vi.clearAllMocks()
     clearCoverLoadCache()
     bookSpineOverlay.value = 'off'
-    mockRouterPush.mockReset()
   })
 
   afterEach(() => {
@@ -303,10 +307,11 @@ describe('BookCarousel', () => {
     expect(wrapper.find('[data-book-id="77"]').exists()).toBe(true)
   })
 
-  it('navigates to book detail on card click', async () => {
+  it('renders each card as a link to book detail', () => {
     const wrapper = mountCarousel([makeBook({ id: 77 })])
-    await wrapper.find('[data-book-id="77"]').trigger('click')
-    expect(mockRouterPush).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 77 } })
+    const link = wrapper.findComponent(RouterLinkStub)
+
+    expect(link.props('to')).toEqual({ name: 'book-detail', params: { bookId: 77 } })
   })
 
   it('scrolls carousel left and right from header controls', async () => {

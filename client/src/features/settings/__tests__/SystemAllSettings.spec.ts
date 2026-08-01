@@ -15,6 +15,11 @@ const routerState = {
 }
 
 vi.mock('vue-router', () => ({
+  RouterLink: {
+    name: 'RouterLink',
+    props: { to: { type: [String, Object, Array], required: true }, replace: Boolean },
+    template: '<a><slot /></a>',
+  },
   useRoute: () => ({ query: routerState.currentQuery }),
   useRouter: () => ({
     replace: vi.fn<(to: { name: string; query: Record<string, string> }) => void>((to) => {
@@ -52,7 +57,7 @@ describe('SystemAllSettings', () => {
   describe('superuser', () => {
     it('sees all four tabs', () => {
       const wrapper = mountComponent(undefined, { su: true })
-      const labels = wrapper.findAll('button').map((b) => b.text())
+      const labels = wrapper.findAll('a').map((link) => link.text())
       expect(labels).toContain('File Naming')
       expect(labels).toContain('Book Dock')
       expect(labels).toContain('Maintenance')
@@ -85,7 +90,7 @@ describe('SystemAllSettings', () => {
   describe('user with manage_app_settings', () => {
     it('sees file-naming and maintenance but not book-dock or audit-log', () => {
       const wrapper = mountComponent(undefined, { perms: ['manage_app_settings'] })
-      const labels = wrapper.findAll('button').map((b) => b.text())
+      const labels = wrapper.findAll('a').map((link) => link.text())
       expect(labels).toContain('File Naming')
       expect(labels).toContain('Maintenance')
       expect(labels).not.toContain('Book Dock')
@@ -96,7 +101,7 @@ describe('SystemAllSettings', () => {
   describe('user with book_dock_access only', () => {
     it('sees book-dock tab only', () => {
       const wrapper = mountComponent(undefined, { perms: ['book_dock_access'] })
-      const labels = wrapper.findAll('button').map((b) => b.text())
+      const labels = wrapper.findAll('a').map((link) => link.text())
       expect(labels).toContain('Book Dock')
       expect(labels).not.toContain('File Naming')
       expect(labels).not.toContain('Maintenance')
@@ -112,7 +117,7 @@ describe('SystemAllSettings', () => {
   describe('non-superuser cannot access audit-log', () => {
     it('does not see audit-log even with manage_app_settings', () => {
       const wrapper = mountComponent(undefined, { perms: ['manage_app_settings'] })
-      const labels = wrapper.findAll('button').map((b) => b.text())
+      const labels = wrapper.findAll('a').map((link) => link.text())
       expect(labels).not.toContain('Audit Log')
     })
 
@@ -124,27 +129,25 @@ describe('SystemAllSettings', () => {
   })
 
   describe('tab navigation', () => {
-    it('active tab button has border-primary class', () => {
+    it('active tab link has border-primary class', () => {
       const wrapper = mountComponent('maintenance', { su: true })
-      const btn = wrapper.findAll('button').find((b) => b.text() === 'Maintenance')
-      expect(btn?.classes()).toContain('border-primary')
+      const maintenanceLink = wrapper.findAll('a').find((link) => link.text() === 'Maintenance')
+      expect(maintenanceLink?.classes()).toContain('border-primary')
     })
 
-    it('inactive tab button has border-transparent class', () => {
+    it('inactive tab link has border-transparent class', () => {
       const wrapper = mountComponent('maintenance', { su: true })
-      const btn = wrapper.findAll('button').find((b) => b.text() === 'File Naming')
-      expect(btn?.classes()).toContain('border-transparent')
+      const fileNamingLink = wrapper.findAll('a').find((link) => link.text() === 'File Naming')
+      expect(fileNamingLink?.classes()).toContain('border-transparent')
     })
 
-    it('clicking a tab switches content', async () => {
-      permState.isSuperuser = true
-      routerState.currentQuery = { tab: 'file-naming' }
-      const wrapper = mount(SystemAllSettings)
+    it('renders the audit-log tab route target', () => {
+      const wrapper = mountComponent('file-naming', { su: true })
+      const auditLink = wrapper.findAllComponents({ name: 'RouterLink' }).find((link) => link.text() === 'Audit Log')
 
-      const btn = wrapper.findAll('button').find((b) => b.text() === 'Audit Log')
-      await btn!.trigger('click')
-
-      expect(wrapper.find('[data-testid="audit-log"]').exists()).toBe(true)
+      expect(auditLink).toBeDefined()
+      expect(auditLink?.props('to')).toEqual({ name: 'settings-system', query: { tab: 'audit-log' } })
+      expect(auditLink?.props('replace')).toBe(true)
     })
 
     it('replaces URL with default tab when no tab param present', () => {

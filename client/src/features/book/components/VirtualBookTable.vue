@@ -13,10 +13,10 @@ import { useTableScrollBehavior } from '@/features/book/composables/useTableScro
 import { useTableResize } from '@/features/book/composables/useTableResize'
 import { useTableDragReorder } from '@/features/book/composables/useTableDragReorder'
 import { useTableKeyboard } from '@/features/book/composables/useTableKeyboard'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 import { useTableSorting } from '@/features/book/composables/useTableSorting'
 import { useTableQuickFilters } from '@/features/book/composables/useTableQuickFilters'
 import { useTableCellHelpers } from '@/features/book/composables/useTableCellHelpers'
-import { useTableCoverDialog } from '@/features/book/composables/useTableCoverDialog'
 import KeyboardShortcutOverlay from './KeyboardShortcutOverlay.vue'
 import { useAuthorSearch } from '@/features/book/composables/useAuthorSearch'
 import { useGenreSearch, useTagSearch } from '@/features/book/composables/useTagSearch'
@@ -25,10 +25,8 @@ import { useRefreshMetadata } from '@/features/book/composables/useRefreshMetada
 import { useRefreshingBooks } from '@/features/book/composables/useRefreshingBooks'
 import { useBookRefreshFeedback } from '@/features/book/composables/useBookRefreshFeedback'
 import type { InFlightOp } from '@/features/book/composables/useBookBulkActions'
-import { useRouter } from 'vue-router'
 import { detectChangedColumns, mergeBookCardWithDetail } from '@/features/book/lib/book-card-mapper'
 import { buildLockStateBookUpdate, mergeBookPatchWithLatest, sameLockFields } from '@/features/book/lib/table-row-state-sync'
-import BookCoverDialog from './table/BookCoverDialog.vue'
 import BookTableCellDispatcher from './table/BookTableCellDispatcher.vue'
 import BookTableCollapsedSeriesCell from './table/BookTableCollapsedSeriesCell.vue'
 import BookTableContextMenu from './table/BookTableContextMenu.vue'
@@ -93,7 +91,6 @@ function isPlaceholderRow(index: number): boolean {
 const { md } = useBreakpoints(breakpointsTailwind)
 const isReadOnly = computed(() => !md.value)
 const { tableDensity, tableZebraStriping } = useDisplaySettings()
-const router = useRouter()
 
 const { fields: allCustomFields } = useActiveCustomFields()
 
@@ -145,11 +142,6 @@ const { getCellValue, isCellLocked, isCellReadOnly, isMandatoryFieldEmpty, isBoo
   locks,
   () => isReadOnly.value,
   () => combinedColumnMap.value,
-)
-const { coverDialogBook, handleCoverClick, handleCoverDialogUpdateBook } = useTableCoverDialog(
-  () => props.selectionMode ?? false,
-  (updated) => emit('update:book', updated),
-  () => loadedBooks.value,
 )
 
 function getChipsSearchFn(colId: string): (q: string) => Promise<string[]> {
@@ -578,14 +570,14 @@ function handleNavigate(book: BookCard, colId: string, direction: 'next' | 'prev
   editor.navigateCell(direction, editableColumnIds.value, book, colId)
 }
 
-function handleRowClick(book: BookCard, e: MouseEvent) {
-  if (props.selectionMode) {
-    emit('select', book.id, e)
-    return
+function handleRowClick(book: BookCard, event: MouseEvent) {
+  if (props.selectionMode && isPlainPrimaryClick(event)) {
+    emit('select', book.id, event)
   }
-  if (book.collapsedSeries) {
-    if (book.seriesId != null) router.push({ name: 'series-detail', params: { seriesId: book.seriesId } })
-  }
+}
+
+function handleRowClickCapture(event: MouseEvent) {
+  if (props.selectionMode && isPlainPrimaryClick(event)) event.preventDefault()
 }
 
 function emitLockStateUpdate(book: BookCard, nextFields: BookCard['lockedFields']) {
@@ -629,7 +621,9 @@ function getRowLockedFieldCount(book: BookCard): number {
 }
 
 function handleRowContextMenu(event: MouseEvent, book: BookCard): void {
+  if (event.target instanceof Element && event.target.closest('a')) return
   if (props.selectionMode) return
+  event.preventDefault()
   openContextMenu(event, book)
 }
 
@@ -799,8 +793,9 @@ defineExpose({
                 focusedRowIndex === vItem.index && !editor.activeCellKey.value ? 'ring-1 ring-inset ring-primary/40' : '',
                 tableZebraStriping && vItem.index % 2 === 1 && !(selectionMode && isSelected?.(rowBook(vItem.index).id)) ? 'bg-muted/20' : '',
               ]"
+              @click.capture="handleRowClickCapture"
               @click="handleRowClick(rowBook(vItem.index), $event)"
-              @contextmenu.prevent="(event) => handleRowContextMenu(event, rowBook(vItem.index))"
+              @contextmenu="(event) => handleRowContextMenu(event, rowBook(vItem.index))"
             >
               <!-- Checkbox cell -->
               <td
@@ -881,7 +876,6 @@ defineExpose({
                     :is-fully-locked="isRowFullyLocked(rowBook(vItem.index))"
                     :locked-field-count="getRowLockedFieldCount(rowBook(vItem.index))"
                     :selection-mode="props.selectionMode ?? false"
-                    :always-show-open-link-icon="isReadOnly"
                     :value="getCellValue(rowBook(vItem.index), col.id)"
                     :search-fn="col.cellType === 'text' ? getTextSearchFn(col.id) : col.cellType === 'chips' ? getChipsSearchFn(col.id) : undefined"
                     :open-link="col.cellType === 'text' ? getTextCellOpenLink(rowBook(vItem.index), col.id) : undefined"
@@ -893,7 +887,6 @@ defineExpose({
                     @save="(value) => handleSave(rowBook(vItem.index), col.id, value)"
                     @cancel="handleCancel(rowBook(vItem.index).id, col.id)"
                     @navigate="(direction) => handleNavigate(rowBook(vItem.index), col.id, direction)"
-                    @cover-click="handleCoverClick(rowBook(vItem.index))"
                     @toggle-lock="handleToggleCellLock(rowBook(vItem.index), col.id)"
                     @lock-all="handleLockAllRow(rowBook(vItem.index))"
                     @unlock-all="handleUnlockAllRow(rowBook(vItem.index))"
@@ -1034,7 +1027,6 @@ defineExpose({
     />
   </div>
 
-  <BookCoverDialog :book="coverDialogBook" :read-only="isReadOnly" @close="coverDialogBook = null" @update:book="handleCoverDialogUpdateBook" />
   <KeyboardShortcutOverlay v-model:open="shortcutOverlayOpen" />
 </template>
 

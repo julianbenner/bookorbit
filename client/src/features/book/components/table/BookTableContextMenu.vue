@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { BookOpen, ExternalLink, FolderInput, FolderPlus, Pencil, RefreshCw, Send, Trash2 } from '@lucide/vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useRefreshMetadata } from '@/features/book/composables/useRefreshMetadata'
@@ -24,7 +24,6 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const router = useRouter()
 const { t } = useI18n()
 const { hasPermission } = usePermissions()
 const { refreshWithFeedback, refreshing } = useRefreshMetadata()
@@ -86,18 +85,6 @@ function emitAction(type: BookActionType): void {
   closeMenu()
 }
 
-function openBookDetails(): void {
-  if (!props.book) return
-  router.push({ name: 'book-detail', params: { bookId: props.book.id } })
-  closeMenu()
-}
-
-function openEditMetadata(): void {
-  if (!props.book) return
-  router.push({ name: 'book-detail', params: { bookId: props.book.id }, query: { tab: 'edit' } })
-  closeMenu()
-}
-
 async function refreshMetadata(): Promise<void> {
   const currentBook = props.book
   if (!currentBook) return
@@ -154,18 +141,21 @@ onBeforeUnmount(() => {
         <BookOpen :size="14" />
         {{ t('book.table.actions.quickView') }}
       </button>
-      <button class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent" @click="openBookDetails">
+      <RouterLink
+        :to="{ name: 'book-detail', params: { bookId: book.id } }"
+        class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+      >
         <ExternalLink :size="14" />
         {{ t('book.table.actions.bookDetails') }}
-      </button>
-      <button
+      </RouterLink>
+      <RouterLink
         v-if="hasPermission('library_edit_metadata')"
+        :to="{ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } }"
         class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-        @click="openEditMetadata"
       >
         <Pencil :size="14" />
         {{ t('book.table.actions.editMetadata') }}
-      </button>
+      </RouterLink>
       <button
         v-if="hasPermission('library_edit_metadata')"
         class="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"

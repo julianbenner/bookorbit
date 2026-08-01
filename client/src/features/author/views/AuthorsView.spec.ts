@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
-import { flushPromises, shallowMount } from '@vue/test-utils'
-import type { AuthorListSort, SortDirection } from '../types/author'
+import { defineComponent, ref } from 'vue'
+import { flushPromises, mount, shallowMount } from '@vue/test-utils'
+import type { AuthorListSort, AuthorSummary, SortDirection } from '../types/author'
 import AuthorsView from './AuthorsView.vue'
 import AuthorFilters from '../components/AuthorFilters.vue'
+import AuthorCard from '../components/AuthorCard.vue'
+import AuthorListRow from '../components/AuthorListRow.vue'
 
 class MockIntersectionObserver {
   observe = vi.fn<(target: Element) => void>()
@@ -14,7 +16,6 @@ class MockIntersectionObserver {
 
 const mocks = vi.hoisted(() => ({
   route: { params: {} as Record<string, string>, query: {} as Record<string, unknown>, fullPath: '/authors' },
-  routerPush: vi.fn<(to: unknown) => Promise<void>>(),
   routerReplace: vi.fn<(to: unknown) => Promise<void>>(),
   fetchLibraries: vi.fn<() => Promise<void>>(),
   load: vi.fn<(reset?: boolean) => Promise<void>>(),
@@ -26,10 +27,14 @@ const mocks = vi.hoisted(() => ({
   minBookCount: null as unknown as { value: number | null },
 }))
 
-vi.mock('vue-router', () => ({
-  useRoute: () => mocks.route,
-  useRouter: () => ({ push: mocks.routerPush, replace: mocks.routerReplace }),
-}))
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-router')>()
+  return {
+    ...actual,
+    useRoute: () => mocks.route,
+    useRouter: () => ({ replace: mocks.routerReplace }),
+  }
+})
 
 vi.mock('vue-sonner', () => ({
   toast: { success: vi.fn<(message: string) => void>(), error: vi.fn<(message: string) => void>(), warning: vi.fn<(message: string) => void>() },
@@ -101,7 +106,6 @@ describe('AuthorsView filters panel placement', () => {
   beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
     mocks.route.query = {}
-    mocks.routerPush.mockResolvedValue()
     mocks.routerReplace.mockResolvedValue()
     mocks.fetchLibraries.mockResolvedValue()
     mocks.load.mockResolvedValue()
@@ -136,5 +140,84 @@ describe('AuthorsView filters panel placement', () => {
     const wrapper = await mountView()
 
     expect(wrapper.findComponent(AuthorFilters).exists()).toBe(false)
+  })
+})
+
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: {
+    to: {
+      type: [String, Object],
+      required: true,
+    },
+  },
+  template: '<a><slot /></a>',
+})
+
+const PassthroughStub = defineComponent({
+  template: '<div><slot /></div>',
+})
+
+const author: AuthorSummary = {
+  id: 7,
+  name: 'Author',
+  sortName: null,
+  description: null,
+  imageUrl: null,
+  bookCount: 4,
+  lastAddedAt: '2026-01-01T00:00:00.000Z',
+}
+
+const authorTarget = { name: 'author-detail', params: { id: author.id }, query: { from: '/authors' } }
+
+function mountAuthorCard(props: { selectionMode?: boolean } = {}) {
+  return mount(AuthorCard, {
+    props: { author, to: authorTarget, ...props },
+    global: {
+      stubs: {
+        RouterLink: RouterLinkStub,
+        DropdownMenu: PassthroughStub,
+        DropdownMenuTrigger: PassthroughStub,
+        DropdownMenuContent: PassthroughStub,
+        DropdownMenuItem: PassthroughStub,
+      },
+    },
+  })
+}
+
+function mountAuthorListRow(props: { selectionMode?: boolean } = {}) {
+  return mount(AuthorListRow, {
+    props: { author, to: authorTarget, ...props },
+    global: {
+      stubs: {
+        RouterLink: RouterLinkStub,
+      },
+    },
+  })
+}
+
+describe('author destination links and selection mode', () => {
+  it('renders author cards and list rows with their detail route targets', () => {
+    const card = mountAuthorCard()
+    const cardLinks = card.findAllComponents(RouterLinkStub)
+    expect(cardLinks).toHaveLength(2)
+    expect(cardLinks.map((link) => link.props('to'))).toEqual([authorTarget, authorTarget])
+
+    const row = mountAuthorListRow()
+    expect(row.getComponent(RouterLinkStub).props('to')).toEqual(authorTarget)
+  })
+
+  it('uses explicit selection mode instead of rendering navigation links', async () => {
+    const card = mountAuthorCard({ selectionMode: true })
+    expect(card.findComponent(RouterLinkStub).exists()).toBe(false)
+    expect(card.find('[role="button"]').exists()).toBe(true)
+    await card.find('[role="button"]').trigger('click')
+    expect(card.emitted('select')).toHaveLength(1)
+
+    const row = mountAuthorListRow({ selectionMode: true })
+    expect(row.findComponent(RouterLinkStub).exists()).toBe(false)
+    expect(row.element.tagName).toBe('BUTTON')
+    await row.trigger('click')
+    expect(row.emitted('select')).toHaveLength(1)
   })
 })

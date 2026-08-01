@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { BookOpen, ChevronDown, Eye, Play } from '@lucide/vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { FORMAT_TO_GROUP, READER_OPENABLE_FORMATS } from '@bookorbit/types'
@@ -89,37 +89,37 @@ function formatBadgeStyle(format: string) {
   }
 }
 
-function openFile(file: BookFileRef | null, mode?: 'peek') {
-  if (!file || props.book.status === 'missing') return
-  router.push({
+function readerRoute(file: BookFileRef) {
+  return {
     name: 'reader',
     params: { bookId: props.book.id, fileId: file.id },
-    query: mode === 'peek' ? { format: file.format ?? 'epub', mode } : { format: file.format ?? 'epub' },
-  })
+    query: { format: file.format ?? 'epub' },
+  }
 }
 
-function openPrimaryFile() {
-  openFile(primaryFile.value)
+function peekFile(file: BookFileRef) {
+  router.push({ ...readerRoute(file), query: { format: file.format ?? 'epub', mode: 'peek' } })
 }
 
 function peekPrimaryFile() {
-  openFile(primaryFile.value, 'peek')
+  if (!primaryFile.value || props.book.status === 'missing') return
+  peekFile(primaryFile.value)
 }
 </script>
 
 <template>
   <div v-if="canOpen" class="flex w-full items-center justify-start">
     <div v-if="hasMultipleFormats" class="mr-auto flex h-7 items-center overflow-hidden rounded-md">
-      <button
-        type="button"
+      <RouterLink
+        :to="readerRoute(primaryFile!)"
         class="inline-flex h-7 w-7 items-center justify-center rounded-l-md text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
         :aria-label="`${actionVerb(primaryFile)} ${formatLabel(primaryFile)}`"
         :title="`${actionVerb(primaryFile)} ${formatLabel(primaryFile)}`"
-        @click.stop="openPrimaryFile"
+        @click.stop
       >
         <Play v-if="primaryIsAudio" :size="13" class="text-sky-500" />
         <BookOpen v-else :size="13" class="text-emerald-500" />
-      </button>
+      </RouterLink>
       <div class="w-px shrink-0 bg-border/80" />
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
@@ -133,17 +133,19 @@ function peekPrimaryFile() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" class="w-48">
-          <DropdownMenuItem v-for="file in openableFiles" :key="file.id" class="gap-2" @select="openFile(file)">
-            <span
-              class="rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-              :style="formatBadgeStyle(file.format?.toLowerCase() ?? '?')"
-            >
-              {{ file.format }}
-            </span>
-            <span class="flex-1 truncate text-xs">{{ actionVerb(file) }} {{ formatLabel(file) }}</span>
-            <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary">{{ t('book.table.read.primary') }}</span>
+          <DropdownMenuItem v-for="file in openableFiles" :key="file.id" class="gap-2" as-child>
+            <RouterLink :to="readerRoute(file)" @click.stop>
+              <span
+                class="rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                :style="formatBadgeStyle(file.format?.toLowerCase() ?? '?')"
+              >
+                {{ file.format }}
+              </span>
+              <span class="flex-1 truncate text-xs">{{ actionVerb(file) }} {{ formatLabel(file) }}</span>
+              <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary">{{ t('book.table.read.primary') }}</span>
+            </RouterLink>
           </DropdownMenuItem>
-          <DropdownMenuItem v-for="file in openableFiles" :key="`peek-${file.id}`" class="gap-2" @select="openFile(file, 'peek')">
+          <DropdownMenuItem v-for="file in openableFiles" :key="`peek-${file.id}`" class="gap-2" @select="peekFile(file)">
             <Eye :size="13" class="text-primary" />
             <span class="flex-1 truncate text-xs">{{ t('book.table.read.peekFormat', { format: formatLabel(file) }) }}</span>
           </DropdownMenuItem>
@@ -152,16 +154,16 @@ function peekPrimaryFile() {
     </div>
 
     <div v-else class="mr-auto inline-flex h-7 items-center overflow-hidden rounded-md">
-      <button
-        type="button"
+      <RouterLink
+        :to="readerRoute(primaryFile!)"
         class="inline-flex h-7 w-7 items-center justify-center rounded-l-md text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
         :aria-label="`${actionVerb(primaryFile)} ${formatLabel(primaryFile)}`"
         :title="`${actionVerb(primaryFile)} ${formatLabel(primaryFile)}`"
-        @click.stop="openPrimaryFile"
+        @click.stop
       >
         <Play v-if="isAudioFile(primaryFile)" :size="13" class="text-sky-500" />
         <BookOpen v-else :size="13" class="text-emerald-500" />
-      </button>
+      </RouterLink>
       <div class="w-px shrink-0 bg-border/80" />
       <button
         type="button"

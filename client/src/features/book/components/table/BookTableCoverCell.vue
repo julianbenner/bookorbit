@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import { Loader2 } from '@lucide/vue'
 import { useCoverVersions } from '../../composables/useCoverVersions'
 import BookCoverArtwork from '../BookCoverArtwork.vue'
@@ -17,7 +18,6 @@ const props = defineProps<{
   isComic: boolean
 }>()
 
-const emit = defineEmits<{ 'cover-click': [] }>()
 const { t } = useI18n()
 const { isRefreshing } = useRefreshingBooks()
 
@@ -50,17 +50,6 @@ onUnmounted(() => {
   if (hoverTimer) clearTimeout(hoverTimer)
 })
 
-function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault()
-    emit('cover-click')
-  }
-}
-
-function handleCoverClick() {
-  emit('cover-click')
-}
-
 const adjustedLeft = computed(() => {
   const previewWidth = 180
   if (previewPos.value.x + previewWidth > window.innerWidth - 8) {
@@ -77,33 +66,34 @@ const adjustedTop = computed(() => {
 
 <template>
   <div class="relative" @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
-    <BookCoverSurface
-      size="mini"
-      :disable-spine="isAudio"
-      :is-comic="isComic"
-      tabindex="0"
-      role="button"
+    <RouterLink
+      :to="{ name: 'book-detail', params: { bookId } }"
       :aria-label="t('book.table.cover.view')"
-      class="book-cover-surface--spine-fitted relative flex h-9 w-9 shrink-0 cursor-pointer overflow-hidden rounded-sm transition-opacity hover:opacity-80"
-      @click="handleCoverClick"
-      @keydown="handleKeydown"
+      class="block w-fit rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
     >
-      <BookCoverArtwork
-        :src="thumbnailSrc"
-        :has-cover="hasCover"
-        :title="title"
-        :author-line="null"
-        :is-audio="isAudio"
-        :seed="seed"
-        :alt="title ?? ''"
-        frame-aspect-ratio="1/1"
-        :spine="!isAudio"
+      <BookCoverSurface
+        size="mini"
+        :disable-spine="isAudio"
         :is-comic="isComic"
-      />
-      <div v-if="isRefreshingBook" class="absolute inset-0 flex items-center justify-center bg-black/50">
-        <Loader2 :size="12" class="animate-spin text-white" />
-      </div>
-    </BookCoverSurface>
+        class="book-cover-surface--spine-fitted relative flex h-9 w-9 shrink-0 cursor-pointer overflow-hidden rounded-sm transition-opacity hover:opacity-80"
+      >
+        <BookCoverArtwork
+          :src="thumbnailSrc"
+          :has-cover="hasCover"
+          :title="title"
+          :author-line="null"
+          :is-audio="isAudio"
+          :seed="seed"
+          :alt="title ?? ''"
+          frame-aspect-ratio="1/1"
+          :spine="!isAudio"
+          :is-comic="isComic"
+        />
+        <div v-if="isRefreshingBook" class="absolute inset-0 flex items-center justify-center bg-black/50">
+          <Loader2 :size="12" class="animate-spin text-white" />
+        </div>
+      </BookCoverSurface>
+    </RouterLink>
 
     <Teleport to="body">
       <div

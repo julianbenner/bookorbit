@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { BookOpen, Play } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { FORMAT_TO_GROUP } from '@bookorbit/types'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
@@ -11,23 +11,10 @@ import { useCurrentlyReadingWidget } from '../../composables/useCurrentlyReading
 
 const { data, loading, error } = useCurrentlyReadingWidget()
 const { t } = useI18n()
-const router = useRouter()
 const { coverUrl } = useCoverVersions()
-
-function goToBook(bookId: number) {
-  void router.push({ name: 'book-detail', params: { bookId } })
-}
 
 function isComic(fileFormat: string | null): boolean {
   return fileFormat != null && FORMAT_TO_GROUP[fileFormat] === 'cbx'
-}
-
-function continueReading(bookId: number, fileId: number | null, fileFormat: string | null) {
-  if (fileId) {
-    void router.push({ name: 'reader', params: { bookId, fileId }, query: { format: fileFormat ?? 'epub' } })
-  } else {
-    void router.push({ name: 'book-detail', params: { bookId } })
-  }
 }
 </script>
 
@@ -66,34 +53,36 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
     <!-- Books list -->
     <div v-else class="flex-1 overflow-y-auto pr-1 [scrollbar-width:thin]">
       <div class="flex flex-col gap-2">
-        <div
-          v-for="book in data.books"
-          :key="book.bookId"
-          class="group/book relative flex min-w-0 cursor-pointer gap-2.5 rounded-lg bg-muted/20 p-1.5 transition-colors hover:bg-muted/40"
-          @click="goToBook(book.bookId)"
-        >
+        <div v-for="book in data.books" :key="book.bookId" class="group/book relative flex min-w-0 gap-2.5 rounded-lg bg-muted/20 p-1.5">
           <!-- Cover thumbnail -->
-          <BookCoverSurface
-            size="mini"
-            class="book-cover-surface--spine-fitted h-14 w-9 shrink-0 overflow-hidden rounded"
-            :is-comic="isComic(book.fileFormat)"
-          >
-            <BookCoverArtwork
-              :src="coverUrl(book.bookId)"
-              :has-cover="book.hasCover"
-              :title="book.title"
-              :author-line="book.authors.length > 0 ? book.authors.join(', ') : null"
-              :is-audio="false"
-              :seed="book.title ?? String(book.bookId)"
-              :alt="book.title ?? t('dashboard.common.bookCover')"
-              frame-aspect-ratio="9/14"
+          <RouterLink :to="{ name: 'book-detail', params: { bookId: book.bookId } }" class="shrink-0">
+            <BookCoverSurface
+              size="mini"
+              class="book-cover-surface--spine-fitted h-14 w-9 overflow-hidden rounded"
               :is-comic="isComic(book.fileFormat)"
-            />
-          </BookCoverSurface>
+            >
+              <BookCoverArtwork
+                :src="coverUrl(book.bookId)"
+                :has-cover="book.hasCover"
+                :title="book.title"
+                :author-line="book.authors.length > 0 ? book.authors.join(', ') : null"
+                :is-audio="false"
+                :seed="book.title ?? String(book.bookId)"
+                :alt="book.title ?? t('dashboard.common.bookCover')"
+                frame-aspect-ratio="9/14"
+                :is-comic="isComic(book.fileFormat)"
+              />
+            </BookCoverSurface>
+          </RouterLink>
 
           <!-- Info -->
           <div class="flex min-w-0 flex-1 flex-col justify-center">
-            <p class="truncate text-xs font-semibold leading-tight">{{ book.title ?? t('dashboard.common.untitled') }}</p>
+            <RouterLink
+              :to="{ name: 'book-detail', params: { bookId: book.bookId } }"
+              class="truncate text-xs font-semibold leading-tight hover:underline"
+            >
+              {{ book.title ?? t('dashboard.common.untitled') }}
+            </RouterLink>
             <p v-if="book.authors.length > 0" class="truncate text-xs text-muted-foreground">
               {{ book.authors.join(', ') }}
             </p>
@@ -107,13 +96,17 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
           </div>
 
           <!-- Continue button (hover) -->
-          <button
+          <RouterLink
+            :to="
+              book.fileId
+                ? { name: 'reader', params: { bookId: book.bookId, fileId: book.fileId }, query: { format: book.fileFormat ?? 'epub' } }
+                : { name: 'book-detail', params: { bookId: book.bookId } }
+            "
             class="absolute right-2 top-1/3 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow transition-opacity group-hover/book:opacity-100"
             :title="t('dashboard.widgets.currentlyReading.continueReading')"
-            @click.stop="continueReading(book.bookId, book.fileId, book.fileFormat)"
           >
             <Play :size="11" class="translate-x-px" />
-          </button>
+          </RouterLink>
         </div>
       </div>
     </div>

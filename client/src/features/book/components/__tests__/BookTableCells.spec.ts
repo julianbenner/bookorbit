@@ -14,6 +14,7 @@ import type { BookCard, BookFileRef, UserBookStatus } from '@bookorbit/types'
 const routerPush = vi.fn<() => void>()
 
 vi.mock('vue-router', () => ({
+  RouterLink: { name: 'RouterLink', props: ['to'], template: '<a><slot /></a>' },
   useRouter: () => ({
     push: routerPush,
   }),
@@ -264,11 +265,15 @@ describe('BookTableReadButtonCell', () => {
     expect(wrapper.text()).toBe('-')
   })
 
-  it('opens the primary readable file on button click', async () => {
-    routerPush.mockReset()
+  it('renders the primary readable file route on the primary action link', () => {
     const wrapper = mountReadButton(makeBook([{ id: 1, format: 'epub', role: 'primary', sizeBytes: null }]))
-    await wrapper.get('button').trigger('click')
-    expect(routerPush).toHaveBeenCalledWith({
+    const primaryLink = wrapper.findAllComponents({ name: 'RouterLink' }).find((link) => {
+      const target = link.props('to') as { params?: { fileId?: number } } | undefined
+      return target?.params?.fileId === 1
+    })
+
+    expect(primaryLink).toBeDefined()
+    expect(primaryLink?.props('to')).toEqual({
       name: 'reader',
       params: { bookId: 42, fileId: 1 },
       query: { format: 'epub' },
@@ -288,8 +293,7 @@ describe('BookTableReadButtonCell', () => {
     })
   })
 
-  it('shows play action for audio formats and allows selecting alternate format', async () => {
-    routerPush.mockReset()
+  it('shows play action for audio formats and allows selecting alternate format', () => {
     const wrapper = mountReadButton(
       makeBook([
         { id: 10, format: 'm4b', role: 'primary', sizeBytes: null },
@@ -300,10 +304,12 @@ describe('BookTableReadButtonCell', () => {
     expect(wrapper.text()).toContain('Play')
     expect(wrapper.text()).toContain('Read EPUB')
 
-    const option = wrapper.findAll('button').find((node) => node.text().includes('Read EPUB'))
-    expect(option).toBeTruthy()
-    await option!.trigger('click')
-    expect(routerPush).toHaveBeenCalledWith({
+    const alternateLink = wrapper.findAllComponents({ name: 'RouterLink' }).find((link) => {
+      const target = link.props('to') as { params?: { fileId?: number } } | undefined
+      return target?.params?.fileId === 11
+    })
+    expect(alternateLink).toBeDefined()
+    expect(alternateLink?.props('to')).toEqual({
       name: 'reader',
       params: { bookId: 42, fileId: 11 },
       query: { format: 'epub' },

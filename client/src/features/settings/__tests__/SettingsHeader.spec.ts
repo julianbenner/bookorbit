@@ -12,10 +12,8 @@ const permState = {
 const routeState = { name: 'settings-appearance' }
 
 vi.mock('vue-router', () => ({
+  RouterLink: { name: 'RouterLink', props: ['to'], template: '<a><slot /></a>' },
   useRoute: () => ({ name: routeState.name }),
-  useRouter: () => ({
-    push: vi.fn<() => Promise<void>>(),
-  }),
 }))
 
 vi.mock('@/features/auth/composables/usePermissions', () => ({
@@ -33,7 +31,7 @@ function mountHeader(opts?: { su?: boolean; perms?: string[]; routeName?: string
 }
 
 function getTabLabels(wrapper: ReturnType<typeof mount>): string[] {
-  return wrapper.findAll('button').map((b) => b.text())
+  return wrapper.findAll('a').map((link) => link.text())
 }
 
 describe('SettingsHeader', () => {
@@ -239,62 +237,62 @@ describe('SettingsHeader', () => {
   })
 
   describe('active state', () => {
-    it('active tab has border-primary class when route matches', () => {
+    it('active tab link has border-primary class when route matches', () => {
       const wrapper = mountHeader({ routeName: 'settings-appearance' })
-      const displayBtn = wrapper.findAll('button').find((b) => b.text() === 'Display')
-      expect(displayBtn?.classes()).toContain('border-primary')
+      const displayLink = wrapper.findAll('a').find((link) => link.text() === 'Display')
+      expect(displayLink?.classes()).toContain('border-primary')
     })
 
     it('inactive tabs have border-transparent class', () => {
       const wrapper = mountHeader({ routeName: 'settings-appearance' })
-      const readerBtn = wrapper.findAll('button').find((b) => b.text() === 'Reader')
-      expect(readerBtn?.classes()).toContain('border-transparent')
+      const readerLink = wrapper.findAll('a').find((link) => link.text() === 'Reader')
+      expect(readerLink?.classes()).toContain('border-transparent')
     })
 
     it('kobo tab is active when route is settings-kobo', () => {
       const wrapper = mountHeader({ routeName: 'settings-kobo', perms: ['kobo_sync'] })
-      const btn = wrapper.findAll('button').find((b) => b.text() === 'Kobo')
-      expect(btn?.classes()).toContain('border-primary')
+      const link = wrapper.findAll('a').find((item) => item.text() === 'Kobo')
+      expect(link?.classes()).toContain('border-primary')
     })
 
     it('KOReader tab is active when route is settings-koreader', () => {
       const wrapper = mountHeader({ routeName: 'settings-koreader', perms: ['koreader_sync'] })
-      const btn = wrapper.findAll('button').find((b) => b.text() === 'KOReader')
-      expect(btn?.classes()).toContain('border-primary')
+      const link = wrapper.findAll('a').find((item) => item.text() === 'KOReader')
+      expect(link?.classes()).toContain('border-primary')
     })
 
     it('Integrations tab is active when route is settings-integrations', () => {
       const wrapper = mountHeader({ routeName: 'settings-integrations', perms: ['storygraph_sync'] })
-      const btn = wrapper.findAll('button').find((b) => b.text() === 'Integrations')
-      expect(btn?.classes()).toContain('border-primary')
+      const link = wrapper.findAll('a').find((item) => item.text() === 'Integrations')
+      expect(link?.classes()).toContain('border-primary')
     })
 
     it('admin tab is active when route is settings-admin', () => {
       const wrapper = mountHeader({ su: true, routeName: 'settings-admin' })
-      const btn = wrapper.findAll('button').find((b) => b.text() === 'Admin')
-      expect(btn?.classes()).toContain('border-primary')
+      const link = wrapper.findAll('a').find((item) => item.text() === 'Admin')
+      expect(link?.classes()).toContain('border-primary')
     })
 
     it('system tab is active when route is settings-system', () => {
       const wrapper = mountHeader({ su: true, routeName: 'settings-system' })
-      const btn = wrapper.findAll('button').find((b) => b.text() === 'System')
-      expect(btn?.classes()).toContain('border-primary')
+      const link = wrapper.findAll('a').find((item) => item.text() === 'System')
+      expect(link?.classes()).toContain('border-primary')
     })
 
     it('account tab is active when route is settings-account', () => {
       const wrapper = mountHeader({ routeName: 'settings-account' })
-      const btn = wrapper.findAll('button').find((b) => b.text() === 'Account')
-      expect(btn?.classes()).toContain('border-primary')
+      const link = wrapper.findAll('a').find((item) => item.text() === 'Account')
+      expect(link?.classes()).toContain('border-primary')
     })
   })
 
   describe('navigation', () => {
-    it('clicking a tab button triggers a click event', async () => {
+    it('renders a tab route target', () => {
       const wrapper = mountHeader({ routeName: 'settings-appearance' })
-      const readerBtn = wrapper.findAll('button').find((b) => b.text() === 'Reader')
-      await readerBtn!.trigger('click')
-      // If click triggers without throwing, navigation is wired correctly
-      expect(readerBtn!.exists()).toBe(true)
+      const readerLink = wrapper.findAllComponents({ name: 'RouterLink' }).find((link) => link.text() === 'Reader')
+
+      expect(readerLink).toBeDefined()
+      expect(readerLink?.props('to')).toEqual({ name: 'settings-reader-general' })
     })
   })
 })

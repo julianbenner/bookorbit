@@ -102,8 +102,8 @@ function syncRouteQuery() {
   })
 }
 
-function openSeries(seriesId: number) {
-  void router.push({ name: 'series-detail', params: { seriesId }, query: { from: route.fullPath } })
+function seriesDetailTo(seriesId: number) {
+  return { name: 'series-detail', params: { seriesId }, query: { from: route.fullPath } }
 }
 
 function setSortField(field: SeriesListSort) {
@@ -495,7 +495,7 @@ defineOptions({ name: 'SeriesView' })
           </div>
         </template>
         <template v-else>
-          <SeriesCard v-for="series in items" :key="series.name" :series="series" @open="openSeries" />
+          <SeriesCard v-for="series in items" :key="series.name" :series="series" :to="seriesDetailTo(series.id)" />
         </template>
       </div>
 

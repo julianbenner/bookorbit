@@ -83,6 +83,11 @@ vi.mock('@/features/auth/composables/useAuth', () => ({
 }))
 
 vi.mock('vue-router', () => ({
+  RouterLink: {
+    name: 'RouterLink',
+    props: { to: { type: [String, Object, Array], required: true }, replace: Boolean },
+    template: '<a><slot /></a>',
+  },
   useRoute: () => routeState,
   useRouter: () => ({ replace: routerReplaceMock }),
 }))
@@ -215,13 +220,17 @@ describe('AppearanceSettings', () => {
     expect(themeStore.setTheme).toHaveBeenCalledWith('system')
   })
 
-  it('switches tabs through the appearance query param', async () => {
+  it('renders the layout tab route target and content for the requested tab', () => {
     const wrapper = mountComponent()
+    const layoutLink = wrapper.findAllComponents({ name: 'RouterLink' }).find((link) => link.attributes('data-testid') === 'appearance-tab-layout')
 
-    await wrapper.get('[data-testid="appearance-tab-layout"]').trigger('click')
+    expect(layoutLink).toBeDefined()
+    expect(layoutLink?.props('to')).toEqual({ name: 'settings-appearance', query: { tab: 'layout' } })
+    expect(layoutLink?.props('replace')).toBe(true)
 
-    expect(routerReplaceMock).toHaveBeenLastCalledWith({ name: 'settings-appearance', query: { tab: 'layout' } })
-    expect(wrapper.findAll('.settings-group-label').map((label) => label.text())).toEqual([
+    routeState.query = { tab: 'layout' }
+    const layoutWrapper = mountComponent()
+    expect(layoutWrapper.findAll('.settings-group-label').map((label) => label.text())).toEqual([
       'Library Grid Layout',
       'Series Display',
       'Author Grid',
@@ -335,8 +344,8 @@ describe('AppearanceSettings', () => {
   })
 
   it('lets the user choose the natural-bottom cover display mode', async () => {
+    routeState.query = { tab: 'book-covers' }
     const wrapper = mountComponent()
-    await wrapper.get('[data-testid="appearance-tab-book-covers"]').trigger('click')
 
     const naturalButton = wrapper.findAll('button').find((button) => button.text().includes('Natural bottom'))
     expect(naturalButton).toBeDefined()
@@ -347,8 +356,8 @@ describe('AppearanceSettings', () => {
   })
 
   it('lets the user choose details-first thumbnail clicks from the behavior tab', async () => {
+    routeState.query = { tab: 'behavior' }
     const wrapper = mountComponent()
-    await wrapper.get('[data-testid="appearance-tab-behavior"]').trigger('click')
 
     const detailsButton = wrapper
       .findAll('[data-testid="thumbnail-click-action-control"] button')
