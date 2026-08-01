@@ -1,29 +1,32 @@
-import { mount } from '@vue/test-utils'
+import { config, mount } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { BookCard } from '@bookorbit/types'
 import CollapsedSeriesCard from '../CollapsedSeriesCard.vue'
+import { defineComponent } from 'vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
-const mockRouterPush = vi.fn<(...args: unknown[]) => unknown>()
-const { mockFetchAuthors } = vi.hoisted(() => ({
-  mockFetchAuthors: vi.fn<(...args: unknown[]) => unknown>(),
-}))
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: {
+    to: {
+      type: [String, Object],
+      required: true,
+    },
+  },
+  template: '<a><slot /></a>',
+})
+config.global.stubs.RouterLink = RouterLinkStub
 
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()
   return {
     ...actual,
-    useRouter: () => ({ push: mockRouterPush }),
     useRoute: () => ({ fullPath: '/test-path' }),
   }
 })
 
 vi.mock('../BookCoverPlaceholder.vue', () => ({
   default: { template: '<div class="book-cover-placeholder" />' },
-}))
-
-vi.mock('@/features/author/api/author', () => ({
-  fetchAuthors: mockFetchAuthors,
 }))
 
 function makeBook(overrides?: Partial<BookCard>): BookCard {
@@ -54,6 +57,7 @@ function makeBook(overrides?: Partial<BookCard>): BookCard {
     coverAspectRatio: '2/3',
     title: 'Book One',
     authors: ['Author A'],
+    authorIds: [202],
     seriesId: 42,
     seriesName: 'The Arc',
     seriesIndex: '1',
@@ -96,7 +100,6 @@ describe('CollapsedSeriesCard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     seriesCardCoverMode.value = 'mosaic'
-    mockFetchAuthors.mockResolvedValue({ items: [] })
   })
 
   afterEach(() => {
@@ -205,19 +208,7 @@ describe('CollapsedSeriesCard', () => {
     expect(wrapper.text()).toContain('Author A')
   })
 
-  it('navigates to series detail by id on click', async () => {
-    const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook() } })
-
-    await wrapper.trigger('click')
-
-    expect(mockRouterPush).toHaveBeenCalledWith({
-      name: 'series-detail',
-      params: { seriesId: 42 },
-      query: { from: '/test-path' },
-    })
-  })
-
-  it('does not navigate while selection mode is replacing collapsed rows', async () => {
+  it('disables navigation while selection mode is replacing collapsed rows', () => {
     gridCardPrimaryLabel.value = 'series-title'
     gridCardSecondaryLabel.value = 'author'
     cardInfoMode.value = 'below-cover'
@@ -225,28 +216,8 @@ describe('CollapsedSeriesCard', () => {
       props: { book: makeBook(), selectionMode: true, showLabel: true },
     })
 
-    await wrapper.trigger('click')
-    await wrapper.find('[data-testid="series-hover-action"]').trigger('click')
-    await wrapper.find('[data-testid="grid-card-label-primary"]').trigger('click')
-    await wrapper.find('[data-testid="grid-card-label-secondary"]').trigger('click')
-
     expect(wrapper.attributes('inert')).toBeDefined()
-    expect(mockRouterPush).not.toHaveBeenCalled()
-    expect(mockFetchAuthors).not.toHaveBeenCalled()
-  })
-
-  it('uses series id even when series name has special characters', async () => {
-    const wrapper = mount(CollapsedSeriesCard, {
-      props: { book: makeBook({ seriesId: 43, seriesName: 'The Wheel & Time' }) },
-    })
-
-    await wrapper.trigger('click')
-
-    expect(mockRouterPush).toHaveBeenCalledWith({
-      name: 'series-detail',
-      params: { seriesId: 43 },
-      query: { from: '/test-path' },
-    })
+    expect(wrapper.findAllComponents(RouterLinkStub).length).toBeGreaterThan(0)
   })
 
   it('shows placeholder instead of img after @error fires', async () => {
@@ -630,32 +601,11 @@ describe('CollapsedSeriesCard', () => {
       expect(overlay).not.toBeNull()
     })
 
-    it('clicking Library button navigates to series-detail', async () => {
-      const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook() } })
-
-      await wrapper.find('[data-testid="series-hover-action"]').trigger('click')
-
-      expect(mockRouterPush).toHaveBeenCalledWith({
-        name: 'series-detail',
-        params: { seriesId: 42 },
-        query: { from: '/test-path' },
-      })
-    })
-
-    it('clicking Library button stops propagation so card handleClick does not also fire', async () => {
-      const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook() } })
-
-      await wrapper.find('[data-testid="series-hover-action"]').trigger('click')
-
-      expect(mockRouterPush).toHaveBeenCalledTimes(1)
-    })
-
-    it('does not navigate when series id is missing', async () => {
+    it('does not render a series link when the series id is missing', () => {
       const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook({ seriesId: null }) } })
+      const routes = wrapper.findAllComponents(RouterLinkStub).map((link) => link.props('to'))
 
-      await wrapper.find('[data-testid="series-hover-action"]').trigger('click')
-
-      expect(mockRouterPush).not.toHaveBeenCalled()
+      expect(routes).not.toContainEqual(expect.objectContaining({ name: 'series-detail' }))
     })
   })
 
@@ -729,118 +679,34 @@ describe('CollapsedSeriesCard', () => {
     })
   })
 
-  describe('below-cover label buttons', () => {
+  describe('below-cover label links', () => {
     function mountWithBelowCoverLabel(overrides?: Partial<BookCard>) {
       cardInfoMode.value = 'below-cover'
       return mount(CollapsedSeriesCard, { props: { book: makeBook(overrides), showLabel: true } })
     }
 
-    it('renders label buttons not paragraphs in below-cover mode', () => {
-      gridCardPrimaryLabel.value = 'series-title'
-      const wrapper = mountWithBelowCoverLabel()
-
-      const primary = wrapper.find('[data-testid="grid-card-label-primary"]')
-      expect(primary.element.tagName).toBe('BUTTON')
-    })
-
     it('does not render label area when showLabel is false', () => {
       gridCardPrimaryLabel.value = 'series-title'
-      cardInfoMode.value = 'below-cover'
       const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook(), showLabel: false } })
 
       expect(wrapper.find('[data-testid="grid-card-label-primary"]').exists()).toBe(false)
     })
 
-    it('clicking series name label navigates to series-detail', async () => {
-      gridCardPrimaryLabel.value = 'series-title'
-      const wrapper = mountWithBelowCoverLabel()
-
-      await wrapper.find('[data-testid="grid-card-label-primary"]').trigger('click')
-
-      expect(mockRouterPush).toHaveBeenCalledWith({
-        name: 'series-detail',
-        params: { seriesId: 42 },
-        query: { from: '/test-path' },
-      })
-    })
-
-    it('clicking series name label stops propagation so card does not also navigate', async () => {
-      gridCardPrimaryLabel.value = 'series-title'
-      const wrapper = mountWithBelowCoverLabel()
-
-      await wrapper.find('[data-testid="grid-card-label-primary"]').trigger('click')
-
-      expect(mockRouterPush).toHaveBeenCalledTimes(1)
-    })
-
-    it('clicking author label calls fetchAuthors to resolve author', async () => {
+    it('renders a missing author id as plain text', () => {
       gridCardSecondaryLabel.value = 'author'
-      const wrapper = mountWithBelowCoverLabel()
+      const wrapper = mountWithBelowCoverLabel({ authorIds: [] })
+      const secondary = wrapper.find('[data-testid="grid-card-label-secondary"]')
 
-      await wrapper.find('[data-testid="grid-card-label-secondary"]').trigger('click')
-      await wrapper.vm.$nextTick()
-
-      expect(mockFetchAuthors).toHaveBeenCalledWith({
-        q: 'Author A',
-        page: 0,
-        size: 5,
-        sort: 'name',
-        order: 'asc',
-      })
+      expect(secondary.element.tagName).toBe('SPAN')
+      expect(secondary.classes()).toContain('cursor-default')
+      expect(wrapper.findAllComponents(RouterLinkStub).some((candidate) => candidate.text() === 'Author A')).toBe(false)
     })
 
-    it('clicking author label navigates to author-detail when author is found by API', async () => {
-      gridCardSecondaryLabel.value = 'author'
-      mockFetchAuthors.mockResolvedValue({ items: [{ id: 42, name: 'Author A' }] })
-      const wrapper = mountWithBelowCoverLabel()
-
-      await wrapper.find('[data-testid="grid-card-label-secondary"]').trigger('click')
-      await wrapper.vm.$nextTick()
-      await wrapper.vm.$nextTick()
-
-      expect(mockRouterPush).toHaveBeenCalledWith({
-        name: 'author-detail',
-        params: { id: 42 },
-        query: { from: '/test-path' },
-      })
-    })
-
-    it('clicking author label navigates to authors list when author is not found by API', async () => {
-      gridCardSecondaryLabel.value = 'author'
-      mockFetchAuthors.mockResolvedValue({ items: [] })
-      const wrapper = mountWithBelowCoverLabel()
-
-      await wrapper.find('[data-testid="grid-card-label-secondary"]').trigger('click')
-      await wrapper.vm.$nextTick()
-      await wrapper.vm.$nextTick()
-
-      expect(mockRouterPush).toHaveBeenCalledWith({
-        name: 'authors',
-        query: { q: 'Author A' },
-      })
-    })
-
-    it('clicking author label falls back to authors list when fetchAuthors throws', async () => {
-      gridCardSecondaryLabel.value = 'author'
-      mockFetchAuthors.mockRejectedValue(new Error('network error'))
-      const wrapper = mountWithBelowCoverLabel()
-
-      await wrapper.find('[data-testid="grid-card-label-secondary"]').trigger('click')
-      await wrapper.vm.$nextTick()
-      await wrapper.vm.$nextTick()
-
-      expect(mockRouterPush).toHaveBeenCalledWith({
-        name: 'authors',
-        query: { q: 'Author A' },
-      })
-    })
-
-    it('does not navigate when clicking author label with no authors', async () => {
+    it('does not render an author label when no authors are present', () => {
       gridCardSecondaryLabel.value = 'author'
       const wrapper = mountWithBelowCoverLabel({ authors: [] })
 
-      const secondary = wrapper.find('[data-testid="grid-card-label-secondary"]')
-      expect(secondary.exists()).toBe(false)
+      expect(wrapper.find('[data-testid="grid-card-label-secondary"]').exists()).toBe(false)
     })
   })
 })

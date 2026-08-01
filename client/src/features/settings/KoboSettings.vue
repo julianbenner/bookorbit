@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDate } from '@/i18n/formatters'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, type RouteLocationRaw } from 'vue-router'
 import { Plus, Trash2, Copy, Check, Pencil, X, Tablet, RefreshCw, History, Download, Upload, Bookmark, Info } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -65,7 +65,6 @@ const currentLimit = ref(20)
 const loadingMore = ref(false)
 
 const route = useRoute()
-const router = useRouter()
 type Tab = 'settings' | 'activity'
 type HistoryDisplayItem = {
   key: string
@@ -86,9 +85,8 @@ const tabs = computed(() => [
   },
 ])
 
-function selectTab(tab: Tab) {
-  activeTab.value = tab
-  router.replace({ name: 'settings-kobo', query: { ...route.query, tab } })
+function tabTarget(tab: Tab): RouteLocationRaw {
+  return { name: 'settings-kobo', query: { ...route.query, tab }, hash: route.hash }
 }
 
 watch(
@@ -715,7 +713,7 @@ function beginCreate() {
   </div>
   <div v-else-if="error" class="settings-error-state">{{ error }}</div>
   <template v-else>
-    <SettingsTabs v-if="!props.embedded" :tabs="tabs" :active-tab="activeTab" @select="selectTab" />
+    <SettingsTabs v-if="!props.embedded" :tabs="tabs" :active-tab="activeTab" :tab-to="tabTarget" />
 
     <div v-show="activeTab === 'settings' || props.embedded">
       <!-- New device token display -->

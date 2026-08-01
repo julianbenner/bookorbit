@@ -31,7 +31,7 @@ function makeBookRow(id: number, overrides?: Partial<Parameters<typeof assembleB
 describe('assembleBookCards', () => {
   it('assembles a simple book card with authors and files', () => {
     const rows = [makeBookRow(1)];
-    const authorRows = [{ bookId: 1, name: 'Author A' }];
+    const authorRows = [{ bookId: 1, authorId: 1, name: 'Author A' }];
     const fileRows = [{ bookId: 1, id: 10, format: 'epub', role: 'primary', sizeBytes: null }];
 
     const [card] = assembleBookCards(rows, authorRows, fileRows, [], []);
@@ -39,6 +39,7 @@ describe('assembleBookCards', () => {
     expect(card.id).toBe(1);
     expect(card.title).toBe('Book 1');
     expect(card.authors).toEqual(['Author A']);
+    expect(card.authorIds).toEqual([1]);
     expect(card.files).toEqual([{ id: 10, format: 'epub', role: 'primary', sizeBytes: null }]);
     expect(card.coverAspectRatio).toBe('2/3');
   });
@@ -193,17 +194,22 @@ describe('assembleBookCards', () => {
     expect(card.genres).toEqual(['Fiction', 'Sci-Fi']);
   });
 
-  it('processes multiple books independently', () => {
+  it('preserves positional author identities and display order across interleaved books', () => {
     const rows = [makeBookRow(1), makeBookRow(2)];
     const authorRows = [
-      { bookId: 1, name: 'Author A' },
-      { bookId: 2, name: 'Author B' },
+      { bookId: 2, authorId: 31, name: 'Shared Author' },
+      { bookId: 1, authorId: 7, name: 'Zelda' },
+      { bookId: 99, authorId: 90, name: 'Outside Page' },
+      { bookId: 2, authorId: 7, name: 'Zelda' },
+      { bookId: 1, authorId: 31, name: 'Shared Author' },
     ];
 
     const cards = assembleBookCards(rows, authorRows, [], [], []);
 
-    expect(cards[0].authors).toEqual(['Author A']);
-    expect(cards[1].authors).toEqual(['Author B']);
+    expect(cards.map((card) => ({ id: card.id, authors: card.authors, authorIds: card.authorIds }))).toEqual([
+      { id: 1, authors: ['Zelda', 'Shared Author'], authorIds: [7, 31] },
+      { id: 2, authors: ['Shared Author', 'Zelda'], authorIds: [31, 7] },
+    ]);
   });
 
   it('returns empty arrays for books with no related data', () => {
@@ -211,6 +217,7 @@ describe('assembleBookCards', () => {
     const [card] = assembleBookCards(rows, [], [], [], []);
 
     expect(card.authors).toEqual([]);
+    expect(card.authorIds).toEqual([]);
     expect(card.files).toEqual([]);
     expect(card.genres).toEqual([]);
   });
@@ -425,6 +432,7 @@ function makeBookCard(id: number, overrides?: Record<string, unknown>) {
     coverAspectRatio: '2/3' as const,
     title: `Book ${id}`,
     authors: [] as string[],
+    authorIds: [] as number[],
     seriesName: null as string | null,
     seriesIndex: null as string | null,
     files: [] as { id: number; format: string | null; role: string }[],
@@ -532,11 +540,12 @@ describe('assembleCollapsedBookCards', () => {
 
   it('preserves base card fields alongside collapsedSeries', () => {
     const rows = [makeCollapsedRow(10, { title: 'Book Ten' })];
-    const authorRows = [{ bookId: 10, name: 'Author X' }];
+    const authorRows = [{ bookId: 10, authorId: 10, name: 'Author X' }];
     const [card] = assembleCollapsedBookCards(rows, authorRows, [], [], []);
 
     expect(card!.title).toBe('Book Ten');
     expect(card!.authors).toEqual(['Author X']);
+    expect(card!.authorIds).toEqual([10]);
     expect(card!.collapsedSeries).toBeDefined();
   });
 });
@@ -591,6 +600,25 @@ describe('collapseBookCards', () => {
     const result = collapseBookCards(cards);
 
     expect(result[0]!.id).toBe(1);
+  });
+
+  it('keeps author identities from the representative volume without mixing other volumes', () => {
+    const cards = assembleBookCards(
+      [makeBookRow(3, { seriesName: 'Arc', seriesIndex: '3' }), makeBookRow(1, { seriesName: 'Arc', seriesIndex: '1' })],
+      [
+        { bookId: 3, authorId: 30, name: 'Later Author' },
+        { bookId: 1, authorId: 20, name: 'First Author' },
+        { bookId: 1, authorId: 10, name: 'Coauthor' },
+      ],
+      [],
+      [],
+      [],
+    );
+
+    const [card] = collapseBookCards(cards);
+
+    expect(card).toMatchObject({ id: 1, authors: ['First Author', 'Coauthor'], authorIds: [20, 10] });
+    expect(card!.collapsedSeries!.bookCount).toBe(2);
   });
 
   it('falls back to addedAt order when seriesIndex is null', () => {

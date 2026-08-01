@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { BookOpen, Copy, Download, Eye, Headphones, MoreVertical } from '@lucide/vue'
 import { formatBytes } from '@/lib/formatting'
 import { formatDate, formatPercent, formatRelativeFromNow } from '@/i18n/formatters'
@@ -27,10 +28,10 @@ const props = defineProps<{
   canDownload: boolean
   canEdit: boolean
   canDelete: boolean
+  readerRoute: (file: TreeFile, mode?: 'peek') => RouteLocationRaw
 }>()
 
 const emit = defineEmits<{
-  open: [file: TreeFile, mode?: 'peek']
   download: [file: TreeFile]
   rename: [file: TreeFile]
   remove: [file: TreeFile]
@@ -85,12 +86,6 @@ const openLabel = computed(() => {
   return progressPercent.value > 0 ? t('book.detail.files.resume') : t('book.detail.files.read')
 })
 
-function handleOpen() {
-  emit('open', props.file)
-}
-function handlePeek() {
-  emit('open', props.file, 'peek')
-}
 function handleDownload() {
   emit('download', props.file)
 }
@@ -231,24 +226,24 @@ function handleCopyPath() {
       </div>
 
       <div class="flex items-center gap-1.5">
-        <button
+        <RouterLink
           v-if="file.openable"
+          :to="readerRoute(file)"
           class="inline-flex h-[34px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          @click="handleOpen"
         >
           <Headphones v-if="file.isAudio" class="size-4" aria-hidden="true" />
           <BookOpen v-else class="size-4" aria-hidden="true" />
           {{ openLabel }}
-        </button>
+        </RouterLink>
         <Tooltip v-if="file.openable && !file.isAudio">
           <TooltipTrigger as-child>
-            <button
+            <RouterLink
+              :to="readerRoute(file, 'peek')"
               class="inline-flex size-[34px] items-center justify-center rounded-lg border border-input transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               :aria-label="t('book.detail.files.peek')"
-              @click="handlePeek"
             >
               <Eye class="size-4" aria-hidden="true" />
-            </button>
+            </RouterLink>
           </TooltipTrigger>
           <TooltipContent>{{ t('book.detail.files.peek') }}</TooltipContent>
         </Tooltip>

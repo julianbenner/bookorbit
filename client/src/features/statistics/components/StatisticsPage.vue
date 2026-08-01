@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { Check, ChevronDown, GripVertical, Settings2 } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 
@@ -34,7 +34,6 @@ const {
 
 const { t } = useI18n()
 const route = useRoute()
-const router = useRouter()
 const { libraries, fetchLibraries } = useLibraries()
 const configOpen = ref(false)
 
@@ -130,36 +129,34 @@ function openConfig() {
 function chartMeta(id: StatisticsChartId) {
   return STATISTICS_CHART_META[id]
 }
-
-function setTab(tab: StatisticsTab) {
-  activeTab.value = tab
-  loaded.value.add(tab)
-  void router.replace({ query: { ...route.query, tab } })
-}
 </script>
 
 <template>
   <div class="flex flex-col gap-6 pt-4">
     <div class="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div class="flex w-full items-center gap-1 rounded-lg bg-muted p-1 sm:w-auto">
-        <button
+        <RouterLink
+          :to="{ query: { ...route.query, tab: 'library' }, hash: route.hash }"
+          replace
+          :aria-current="activeTab === 'library' ? 'page' : undefined"
           :class="[
             'flex-1 rounded-md px-4 py-1.5 text-sm font-medium transition-colors sm:flex-none',
             activeTab === 'library' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
           ]"
-          @click="setTab('library')"
         >
           {{ t('statistics.tabs.library') }}
-        </button>
-        <button
+        </RouterLink>
+        <RouterLink
+          :to="{ query: { ...route.query, tab: 'user' }, hash: route.hash }"
+          replace
+          :aria-current="activeTab === 'user' ? 'page' : undefined"
           :class="[
             'flex-1 rounded-md px-4 py-1.5 text-sm font-medium transition-colors sm:flex-none',
             activeTab === 'user' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
           ]"
-          @click="setTab('user')"
         >
           {{ t('statistics.tabs.user') }}
-        </button>
+        </RouterLink>
       </div>
 
       <div class="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:justify-end">

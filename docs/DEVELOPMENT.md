@@ -368,6 +368,8 @@ These are the rules that most commonly cause PR rejections. Following them from 
 - **Bare method references in templates.** Write `@click="handleFoo"`, not `@click="handleFoo()"` or `@click="() => handleFoo()"`. This is enforced by ESLint and will block commits.
 - **Composables over stores.** Feature-local state lives in composables (`features/<name>/composables/use*.ts`). Use Pinia only when state genuinely needs to be shared app-wide.
 - **Native fetch only.** HTTP calls use the native `fetch` API. No axios or other HTTP clients.
+- **Native navigation links.** Use `RouterLink` for internal destinations and `<a>` for external ones; keep state-changing actions as buttons. Let the browser handle middle and modified clicks. Use `isPlainPrimaryClick` before closing a dialog or sidebar, not to intercept navigation.
+- **Route-driven navigation.** Tab links change only their query parameter and preserve the remaining query and hash. Selection mode takes precedence over navigation and retains Shift/Ctrl/Cmd selection modifiers.
 
 ---
 

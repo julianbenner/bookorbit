@@ -12,6 +12,7 @@ import { useSelectionCapability } from '@embedpdf/plugin-selection/vue'
 import { SpreadMode, useSpread } from '@embedpdf/plugin-spread/vue'
 import { ZoomMode, useZoom, type ZoomLevel } from '@embedpdf/plugin-zoom/vue'
 import type { AnnotationItem, PdfReaderSettings } from '@bookorbit/types'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 import { useFullscreen } from '../../shared/composables/useFullscreen'
 import PdfDocumentViewport from './PdfDocumentViewport.vue'
 import PdfPasswordPrompt from './PdfPasswordPrompt.vue'
@@ -240,10 +241,9 @@ function handleCancelExternalLink() {
   pendingExternalUrl.value = null
 }
 
-function handleOpenExternalLink() {
-  const url = pendingExternalUrl.value
+function handleExternalLinkClick(event: MouseEvent) {
+  if (!isPlainPrimaryClick(event)) return
   pendingExternalUrl.value = null
-  if (url) window.open(url.href, '_blank', 'noopener,noreferrer')
 }
 
 function handleRetryDocument() {
@@ -565,9 +565,15 @@ onUnmounted(() => {
           >
             {{ t('common.cancel') }}
           </button>
-          <button class="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" @click="handleOpenExternalLink">
+          <a
+            :href="pendingExternalUrl.href"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+            @click="handleExternalLinkClick"
+          >
             {{ t('reader.pdf.openLink') }}
-          </button>
+          </a>
         </div>
       </div>
     </div>

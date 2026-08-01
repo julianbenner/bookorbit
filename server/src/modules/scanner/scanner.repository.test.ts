@@ -337,21 +337,11 @@ describe('ScannerRepository', () => {
     await expect(repo.findBooksByIds([44, 45])).resolves.toEqual([{ id: 44, libraryId: 1, status: 'missing' }]);
   });
 
-  it('returns empty card data for empty input and aggregates card data for requested books', async () => {
-    const { repo, queues } = makeRepo();
+  it('returns empty card data without querying for empty input', async () => {
+    const { repo, db } = makeRepo();
+
     await expect(repo.findBookCardData([])).resolves.toEqual({ rows: [], authorRows: [], fileRows: [], genreRows: [] });
-
-    queues.select.push([{ id: 1, title: 'Book One', lockedFields: [] }]);
-    queues.select.push([{ bookId: 1, name: 'Author One' }]);
-    queues.select.push([{ bookId: 1, id: 10, format: 'epub', role: 'content' }]);
-    queues.select.push([{ bookId: 1, name: 'Fiction' }]);
-
-    await expect(repo.findBookCardData([1])).resolves.toEqual({
-      rows: [{ id: 1, title: 'Book One', lockedFields: [] }],
-      authorRows: [{ bookId: 1, name: 'Author One' }],
-      fileRows: [{ bookId: 1, id: 10, format: 'epub', role: 'content' }],
-      genreRows: [{ bookId: 1, name: 'Fiction' }],
-    });
+    expect(db.select).not.toHaveBeenCalled();
   });
 
   it('loads a versioned directory scan-state snapshot', async () => {

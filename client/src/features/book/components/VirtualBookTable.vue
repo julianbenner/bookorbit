@@ -25,7 +25,6 @@ import { useRefreshMetadata } from '@/features/book/composables/useRefreshMetada
 import { useRefreshingBooks } from '@/features/book/composables/useRefreshingBooks'
 import { useBookRefreshFeedback } from '@/features/book/composables/useBookRefreshFeedback'
 import type { InFlightOp } from '@/features/book/composables/useBookBulkActions'
-import { useRouter } from 'vue-router'
 import { detectChangedColumns, mergeBookCardWithDetail } from '@/features/book/lib/book-card-mapper'
 import { buildLockStateBookUpdate, mergeBookPatchWithLatest, sameLockFields } from '@/features/book/lib/table-row-state-sync'
 import BookCoverDialog from './table/BookCoverDialog.vue'
@@ -95,7 +94,6 @@ function isPlaceholderRow(index: number): boolean {
 const { md } = useBreakpoints(breakpointsTailwind)
 const isReadOnly = computed(() => !md.value)
 const { tableDensity, tableZebraStriping } = useDisplaySettings()
-const router = useRouter()
 
 const { fields: allCustomFields } = useActiveCustomFields()
 
@@ -163,8 +161,14 @@ function getChipsSearchFn(colId: string): (q: string) => Promise<string[]> {
   return () => Promise.resolve([])
 }
 
-function getChipsLinkFn(colId: string): ((chip: string) => string | null) | undefined {
-  if (colId === 'authors') return (name) => `/authors?q=${encodeURIComponent(name)}`
+function getChipsLinkFn(book: BookCard, colId: string): ((chip: string, index: number) => string | null) | undefined {
+  if (colId === 'authors') {
+    return (_chip, index) => {
+      const authorId = book.authorIds?.[index]
+      if (authorId != null) return `/authors/${authorId}`
+      return null
+    }
+  }
   return undefined
 }
 
@@ -582,20 +586,12 @@ function handleNavigate(book: BookCard, colId: string, direction: 'next' | 'prev
   editor.navigateCell(direction, editableColumnIds.value, book, colId)
 }
 
-function handleRowClick(book: BookCard, e: MouseEvent) {
-  if (props.selectionMode) {
-    if (book.collapsedSeries) return
-    emit('select', book.id, e)
-    return
-  }
-  if (book.collapsedSeries) {
-    handleOpenSeries(book)
-  }
-}
-
-function handleOpenSeries(book: BookCard) {
-  if (book.seriesId == null) return
-  void router.push({ name: 'series-detail', params: { seriesId: book.seriesId } })
+function handleRowSelection(book: BookCard, event: MouseEvent) {
+  if (!props.selectionMode) return
+  if (event.target instanceof Element && event.target.closest('input[type="checkbox"]')) return
+  event.preventDefault()
+  event.stopPropagation()
+  if (!book.collapsedSeries && event.button === 0) emit('select', book.id, event)
 }
 
 function emitLockStateUpdate(book: BookCard, nextFields: BookCard['lockedFields']) {
@@ -639,7 +635,9 @@ function getRowLockedFieldCount(book: BookCard): number {
 }
 
 function handleRowContextMenu(event: MouseEvent, book: BookCard): void {
+  if (event.target instanceof Element && event.target.closest('a')) return
   if (props.selectionMode) return
+  event.preventDefault()
   openContextMenu(event, book)
 }
 
@@ -809,8 +807,9 @@ defineExpose({
                 focusedRowIndex === vItem.index && !editor.activeCellKey.value ? 'ring-1 ring-inset ring-primary/40' : '',
                 tableZebraStriping && vItem.index % 2 === 1 && !(selectionMode && isSelected?.(rowBook(vItem.index).id)) ? 'bg-muted/20' : '',
               ]"
-              @click="handleRowClick(rowBook(vItem.index), $event)"
-              @contextmenu.prevent="(event) => handleRowContextMenu(event, rowBook(vItem.index))"
+              @click.capture="handleRowSelection(rowBook(vItem.index), $event)"
+              @auxclick.capture="handleRowSelection(rowBook(vItem.index), $event)"
+              @contextmenu="(event) => handleRowContextMenu(event, rowBook(vItem.index))"
             >
               <!-- Checkbox cell -->
               <td
@@ -878,7 +877,7 @@ defineExpose({
                 @click="focusTableCell(vItem.index, colIdx, $event, rowBook(vItem.index).id, col.id)"
               >
                 <template v-if="rowBook(vItem.index).collapsedSeries">
-                  <BookTableCollapsedSeriesCell :book="rowBook(vItem.index)" :col-id="col.id" @open-series="handleOpenSeries(rowBook(vItem.index))" />
+                  <BookTableCollapsedSeriesCell :book="rowBook(vItem.index)" :col-id="col.id" />
                 </template>
                 <template v-else>
                   <BookTableCellDispatcher
@@ -897,7 +896,7 @@ defineExpose({
                     :search-fn="col.cellType === 'text' ? getTextSearchFn(col.id) : col.cellType === 'chips' ? getChipsSearchFn(col.id) : undefined"
                     :open-link="col.cellType === 'text' ? getTextCellOpenLink(rowBook(vItem.index), col.id) : undefined"
                     :open-link-label="col.cellType === 'text' ? getTextCellOpenLinkLabel(col.id) : undefined"
-                    :link-fn="col.cellType === 'chips' ? getChipsLinkFn(col.id) : undefined"
+                    :link-fn="col.cellType === 'chips' ? getChipsLinkFn(rowBook(vItem.index), col.id) : undefined"
                     :chip-action-fn="col.cellType === 'chips' ? getChipsActionFn(col.id) : undefined"
                     :allow-decimal="col.id === 'seriesIndex'"
                     @activate="handleActivate(rowBook(vItem.index), col.id)"

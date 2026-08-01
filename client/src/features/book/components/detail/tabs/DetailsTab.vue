@@ -71,6 +71,7 @@ import BookMissingFormatRequest from '@/features/book-requests/components/BookMi
 import { useBookReadingLog } from '@/features/book/composables/useBookReadingLog'
 import { useProviderLinkSettings } from '@/features/book/composables/useProviderLinkSettings'
 import { hasReadAlong } from '@/features/book/lib/file-capabilities'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 
 type FileProgress = {
   percentage: number
@@ -112,7 +113,6 @@ const mobileScoreBreakdownOpen = ref(false)
 const moreMenuOpen = ref(false)
 const mobileMoreMenuOpen = ref(false)
 const readMenuOpen = ref(false)
-const mobileReadMenuOpen = ref(false)
 const showSendDialog = ref(false)
 const showPersonalReview = ref(false)
 
@@ -1058,31 +1058,16 @@ function openEditCover() {
   router.push({ name: 'book-detail', params: { bookId: props.book.id }, query: { tab: 'edit' } })
 }
 
-function openBookWithMode(mode?: 'peek') {
-  if (!primaryFile.value) return
-  router.push({
-    name: 'reader',
-    params: { bookId: props.book.id, fileId: primaryFile.value.id },
-    query: mode === 'peek' ? { format: primaryFile.value.format ?? 'epub', mode } : { format: primaryFile.value.format ?? 'epub' },
-  })
-}
-
-function openBook() {
-  openBookWithMode()
-}
-
-function peekBook() {
-  openBookWithMode('peek')
-}
-
-function openBookFile(file: BookDetail['files'][number], mode?: 'peek') {
-  readMenuOpen.value = false
-  mobileReadMenuOpen.value = false
-  router.push({
+function readerRoute(file: BookDetail['files'][number], mode?: 'peek') {
+  return {
     name: 'reader',
     params: { bookId: props.book.id, fileId: file.id },
     query: mode === 'peek' ? { format: file.format ?? 'epub', mode } : { format: file.format ?? 'epub' },
-  })
+  }
+}
+
+function closeReadMenuOnNavigation(event: MouseEvent) {
+  if (isPlainPrimaryClick(event)) readMenuOpen.value = false
 }
 
 function isResettingFile(fileId: number | null): boolean {
@@ -1369,10 +1354,19 @@ watch(
           <div class="flex gap-2">
             <!-- Read/Play button: split when multiple files, plain when single -->
             <div v-if="hasMultipleFiles" class="flex flex-1 h-9 rounded-md overflow-hidden">
+              <RouterLink
+                v-if="primaryFile"
+                :to="readerRoute(primaryFile)"
+                class="flex flex-1 items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                <Headphones v-if="isPrimaryAudio" class="size-4" />
+                <BookOpen v-else class="size-4" />
+                {{ isPrimaryAudio ? t('book.detail.details.listen') : t('book.detail.details.read') }}
+              </RouterLink>
               <button
-                class="flex flex-1 items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-                :disabled="!primaryFile"
-                @click="openBook"
+                v-else
+                class="flex flex-1 items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+                disabled
               >
                 <Headphones v-if="isPrimaryAudio" class="size-4" />
                 <BookOpen v-else class="size-4" />
@@ -1389,11 +1383,12 @@ watch(
                   </button>
                 </PopoverTrigger>
                 <PopoverContent class="w-52 p-1" align="end">
-                  <button
+                  <RouterLink
                     v-for="file in openableFiles"
                     :key="file.id"
+                    :to="readerRoute(file)"
                     class="flex w-full items-center gap-2.5 px-2 py-1.5 rounded-xs text-sm hover:bg-muted transition-colors"
-                    @click="openBookFile(file)"
+                    @click="closeReadMenuOnNavigation"
                   >
                     <BookFormatChip :format-key="fileFormatKey(file) ?? '?'" class="shrink-0 rounded-xs px-1.5 py-0.5 text-[10px] tracking-wider" />
                     <span class="flex-1 text-left text-muted-foreground text-xs truncate">
@@ -1405,28 +1400,46 @@ watch(
                     <span v-if="file.role === 'primary' && !isMultiTrackAudio" class="text-[10px] text-primary font-medium shrink-0">{{
                       t('book.detail.details.primary')
                     }}</span>
-                  </button>
+                  </RouterLink>
                 </PopoverContent>
               </Popover>
             </div>
-            <button
-              v-else
-              class="flex flex-1 items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-              :disabled="!primaryFile"
-              @click="openBook"
-            >
-              <Headphones v-if="isPrimaryAudio" class="size-4" />
-              <BookOpen v-else class="size-4" />
-              {{ isPrimaryAudio ? t('book.detail.details.listen') : t('book.detail.details.read') }}
-            </button>
+            <template v-else>
+              <RouterLink
+                v-if="primaryFile"
+                :to="readerRoute(primaryFile)"
+                class="flex flex-1 items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                <Headphones v-if="isPrimaryAudio" class="size-4" />
+                <BookOpen v-else class="size-4" />
+                {{ isPrimaryAudio ? t('book.detail.details.listen') : t('book.detail.details.read') }}
+              </RouterLink>
+              <button
+                v-else
+                class="flex flex-1 items-center justify-center gap-2 h-9 rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+                disabled
+              >
+                <Headphones v-if="isPrimaryAudio" class="size-4" />
+                <BookOpen v-else class="size-4" />
+                {{ isPrimaryAudio ? t('book.detail.details.listen') : t('book.detail.details.read') }}
+              </button>
+            </template>
 
             <Tooltip>
               <TooltipTrigger as-child>
-                <button
-                  class="flex items-center justify-center h-9 w-12 shrink-0 rounded-md border border-input bg-background hover:bg-muted transition-colors disabled:opacity-50"
-                  :disabled="!primaryFile"
+                <RouterLink
+                  v-if="primaryFile"
+                  :to="readerRoute(primaryFile, 'peek')"
+                  class="flex items-center justify-center h-9 w-12 shrink-0 rounded-md border border-input bg-background hover:bg-muted transition-colors"
                   :aria-label="t('book.detail.details.peek')"
-                  @click="peekBook"
+                >
+                  <Eye class="size-4" />
+                </RouterLink>
+                <button
+                  v-else
+                  disabled
+                  class="flex items-center justify-center h-9 w-12 shrink-0 rounded-md border border-input bg-background opacity-50"
+                  :aria-label="t('book.detail.details.peek')"
                 >
                   <Eye class="size-4" />
                 </button>

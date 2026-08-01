@@ -19,7 +19,7 @@ import {
   Languages,
   Info,
 } from '@lucide/vue'
-import { useRouter, useRoute } from 'vue-router'
+import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { SidebarTrigger } from '@/components/ui/sidebar'
@@ -58,6 +58,7 @@ import { useNotifications } from '@/features/notifications/composables/useNotifi
 import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
 import UserAvatar from '@/components/UserAvatar.vue'
 import { LOCALE_LABELS, Permission, type Locale } from '@bookorbit/types'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 import { useThemeStore } from '@/stores/theme'
 import { useLocaleStore } from '@/stores/locale'
 import BookFormatChip from '@/features/book/components/BookFormatChip.vue'
@@ -106,14 +107,6 @@ const isStatisticsActive = computed(() => route.name === 'statistics')
 const isAchievementsActive = computed(() => route.name === 'achievements')
 const achievementsEnabled = computed(() => user.value?.settings?.achievementPreferences?.enabled !== false)
 
-function navigateToStatistics() {
-  router.push({ name: 'statistics', query: { tab: 'library' } })
-}
-
-function navigateToAchievements() {
-  router.push({ name: 'achievements' })
-}
-
 const canChangePassword = computed(
   () => !isDemoRestrictedAccount.value && user.value?.provisioningMethod !== 'oidc' && user.value?.provisioningMethod !== 'shared',
 )
@@ -121,14 +114,6 @@ const canAccessNotifications = computed(() => hasPermission(Permission.Notificat
 const GLOBAL_SEARCH_ROW_HEIGHT = 84
 const GLOBAL_SEARCH_OVERSCAN = 4
 const GLOBAL_SEARCH_VIEWPORT_HEIGHT = 512
-
-function navigateToAccount() {
-  router.push({ name: 'settings-account' })
-}
-
-function navigateToSettings() {
-  router.push({ name: 'settings-libraries' })
-}
 
 const appearanceSheetOpen = ref(false)
 const languageSheetOpen = ref(false)
@@ -153,15 +138,12 @@ function openAppearanceSheet() {
   appearanceSheetOpen.value = true
 }
 
-function navigateToWhatsNew() {
-  router.push({ name: 'whats-new' })
-}
-
 const uploadOpen = ref(false)
 
 const searchFocused = ref(false)
 const mobileSearchOpen = ref(false)
 const desktopSearchInput = ref<HTMLInputElement | null>(null)
+const desktopSearchContainer = ref<HTMLElement | null>(null)
 const mobileSearchInput = ref<HTMLInputElement | null>(null)
 const searchDropdownRef = ref<HTMLElement | null>(null)
 const searchDropdownScrollTop = ref(0)
@@ -213,7 +195,20 @@ const globalSearchVirtualRows = computed(() => {
   })
 })
 
-function onSearchBlur() {
+function onSearchFocus() {
+  searchFocused.value = true
+}
+
+function onSearchBlur(event: FocusEvent) {
+  // Opening another tab can move focus out of the document before the link's auxclick.
+  if (!event.relatedTarget) return
+  if (event.currentTarget instanceof Node && event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return
+  searchFocused.value = false
+  selectedIndex.value = -1
+}
+
+function handleSearchPointerDown(event: PointerEvent) {
+  if (event.target instanceof Node && desktopSearchContainer.value?.contains(event.target)) return
   searchFocused.value = false
   selectedIndex.value = -1
 }
@@ -265,6 +260,12 @@ function navigateToResult(result: GlobalSearchResult) {
   router.push({ name: 'book-detail', params: { bookId: result.id } })
 }
 
+function handleSearchResultClick(event: MouseEvent) {
+  if (!isPlainPrimaryClick(event)) return
+  clearSearch()
+  mobileSearchOpen.value = false
+}
+
 function handleSearchKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') {
     clearSearch()
@@ -305,6 +306,7 @@ function handleGlobalKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKeydown)
+  document.addEventListener('pointerdown', handleSearchPointerDown)
   if (canAccessNotifications.value) {
     subscribeNotifications()
   }
@@ -330,6 +332,7 @@ const stopLibraryUploadListener = onLibraryUploadCompleted((event) => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
+  document.removeEventListener('pointerdown', handleSearchPointerDown)
   stopLibraryUploadListener()
 })
 
@@ -374,7 +377,6 @@ function resultFormatEntries(result: GlobalSearchResult) {
             v-if="showDropdown"
             ref="searchDropdownRef"
             data-testid="global-search-dropdown"
-            @mousedown.prevent
             @scroll.passive="handleSearchDropdownScroll"
             class="absolute top-full left-0 right-0 mt-1 max-h-[min(32rem,calc(100dvh-5rem))] overflow-y-auto overflow-x-hidden rounded-md border border-border bg-background shadow-lg z-50"
           >
@@ -388,11 +390,12 @@ function resultFormatEntries(result: GlobalSearchResult) {
               {{ t('components.appHeader.noResults') }}
             </div>
             <div v-if="globalResults.length > 0" class="relative" :style="globalSearchVirtualHeightStyle">
-              <button
+              <RouterLink
                 v-for="row in globalSearchVirtualRows"
                 :key="row.result.id"
+                :to="{ name: 'book-detail', params: { bookId: row.result.id } }"
                 :style="row.style"
-                @click="navigateToResult(row.result)"
+                @click="handleSearchResultClick"
                 :class="[
                   'absolute left-0 right-0 flex items-center gap-3 border-b border-border px-3 py-2.5 text-left transition-colors',
                   selectedIndex === row.index ? 'bg-accent' : 'hover:bg-accent/60',
@@ -435,7 +438,7 @@ function resultFormatEntries(result: GlobalSearchResult) {
                     class="gap-0.5 text-[11px] px-1 py-0.5 rounded-xs"
                   />
                 </div>
-              </button>
+              </RouterLink>
             </div>
             <div v-if="globalResults.length > 0" class="border-t border-border px-3 py-2 text-center text-[13px] text-muted-foreground">
               <button
@@ -461,13 +464,17 @@ function resultFormatEntries(result: GlobalSearchResult) {
       <Separator orientation="vertical" class="mx-1 h-4" />
 
       <!-- Center: desktop global search -->
-      <div data-tour="global-search" class="relative mx-4 hidden w-full max-w-2xl items-center md:flex">
+      <div
+        ref="desktopSearchContainer"
+        data-tour="global-search"
+        class="relative mx-4 hidden w-full max-w-2xl items-center md:flex"
+        @focusin="onSearchFocus"
+        @focusout="onSearchBlur"
+      >
         <Search class="pointer-events-none absolute left-3 text-muted-foreground" :size="14" />
         <input
           ref="desktopSearchInput"
           v-model="globalSearchQuery"
-          @focus="searchFocused = true"
-          @blur="onSearchBlur"
           @keydown="handleSearchKeydown"
           :placeholder="t('components.appHeader.searchAllBooks')"
           :class="[
@@ -499,7 +506,6 @@ function resultFormatEntries(result: GlobalSearchResult) {
             v-if="showDropdown"
             ref="searchDropdownRef"
             data-testid="global-search-dropdown"
-            @mousedown.prevent
             @scroll.passive="handleSearchDropdownScroll"
             class="absolute top-full left-0 right-0 mt-1 max-h-[min(32rem,calc(100dvh-5rem))] overflow-y-auto overflow-x-hidden rounded-md border border-border bg-background shadow-lg z-50"
           >
@@ -513,11 +519,12 @@ function resultFormatEntries(result: GlobalSearchResult) {
               {{ t('components.appHeader.noResults') }}
             </div>
             <div v-if="globalResults.length > 0" class="relative" :style="globalSearchVirtualHeightStyle">
-              <button
+              <RouterLink
                 v-for="row in globalSearchVirtualRows"
                 :key="row.result.id"
+                :to="{ name: 'book-detail', params: { bookId: row.result.id } }"
                 :style="row.style"
-                @click="navigateToResult(row.result)"
+                @click="handleSearchResultClick"
                 :class="[
                   'absolute left-0 right-0 flex items-center gap-3 border-b border-border px-3 py-2.5 text-left transition-colors',
                   selectedIndex === row.index ? 'bg-accent' : 'hover:bg-accent/60',
@@ -560,7 +567,7 @@ function resultFormatEntries(result: GlobalSearchResult) {
                     class="gap-0.5 text-[11px] px-1 py-0.5 rounded-xs"
                   />
                 </div>
-              </button>
+              </RouterLink>
             </div>
             <div v-if="globalResults.length > 0" class="border-t border-border px-3 py-2 text-center text-[13px] text-muted-foreground">
               <button
@@ -609,13 +616,17 @@ function resultFormatEntries(result: GlobalSearchResult) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" class="w-44">
-            <DropdownMenuItem @click="navigateToStatistics">
-              <BarChart3 :size="15" class="mr-2 text-muted-foreground" />
-              {{ t('components.appHeader.statistics') }}
+            <DropdownMenuItem as-child>
+              <RouterLink :to="{ name: 'statistics', query: { tab: 'library' } }">
+                <BarChart3 :size="15" class="mr-2 text-muted-foreground" />
+                {{ t('components.appHeader.statistics') }}
+              </RouterLink>
             </DropdownMenuItem>
-            <DropdownMenuItem v-if="achievementsEnabled" @click="navigateToAchievements">
-              <Trophy :size="15" class="mr-2 text-muted-foreground" />
-              {{ t('components.appHeader.achievements') }}
+            <DropdownMenuItem v-if="achievementsEnabled" as-child>
+              <RouterLink :to="{ name: 'achievements' }">
+                <Trophy :size="15" class="mr-2 text-muted-foreground" />
+                {{ t('components.appHeader.achievements') }}
+              </RouterLink>
             </DropdownMenuItem>
             <DropdownMenuItem v-if="hasPermission('library_upload')" @click="uploadOpen = true">
               <Upload :size="15" class="mr-2 text-muted-foreground" />
@@ -635,17 +646,21 @@ function resultFormatEntries(result: GlobalSearchResult) {
               <span class="ms-auto ps-3 text-xs text-muted-foreground">{{ currentLanguageLabel }}</span>
             </DropdownMenuItem>
 
-            <DropdownMenuItem @click="navigateToSettings">
-              <Settings :size="15" class="mr-2 text-muted-foreground" />
-              {{ t('components.appHeader.settings') }}
+            <DropdownMenuItem as-child>
+              <RouterLink :to="{ name: 'settings-libraries' }">
+                <Settings :size="15" class="mr-2 text-muted-foreground" />
+                {{ t('components.appHeader.settings') }}
+              </RouterLink>
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem @click="navigateToWhatsNew">
-              <Sparkles :size="15" class="mr-2 text-muted-foreground" />
-              {{ t('components.appHeader.whatsNew') }}
-              <span v-if="hasUnseenWhatsNew" class="ml-auto h-1.5 w-1.5 rounded-full bg-primary" :aria-label="t('components.appHeader.new')" />
+            <DropdownMenuItem as-child>
+              <RouterLink :to="{ name: 'whats-new' }">
+                <Sparkles :size="15" class="mr-2 text-muted-foreground" />
+                {{ t('components.appHeader.whatsNew') }}
+                <span v-if="hasUnseenWhatsNew" class="ml-auto h-1.5 w-1.5 rounded-full bg-primary" :aria-label="t('components.appHeader.new')" />
+              </RouterLink>
             </DropdownMenuItem>
             <DropdownMenuItem as-child>
               <a :href="documentationUrl" target="_blank" rel="noopener noreferrer">
@@ -670,14 +685,16 @@ function resultFormatEntries(result: GlobalSearchResult) {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
+                as-child
                 data-tour="statistics-btn"
                 variant="ghost"
                 size="icon"
                 :class="destinationClass(isStatisticsActive)"
                 :aria-label="t('components.appHeader.statistics')"
-                @click="navigateToStatistics"
               >
-                <BarChart3 :size="15" />
+                <RouterLink :to="{ name: 'statistics', query: { tab: 'library' } }">
+                  <BarChart3 :size="15" />
+                </RouterLink>
               </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('components.appHeader.statistics') }}</TooltipContent>
@@ -686,13 +703,15 @@ function resultFormatEntries(result: GlobalSearchResult) {
           <Tooltip v-if="achievementsEnabled">
             <TooltipTrigger as-child>
               <Button
+                as-child
                 variant="ghost"
                 size="icon"
                 :class="destinationClass(isAchievementsActive)"
                 :aria-label="t('components.appHeader.achievements')"
-                @click="navigateToAchievements"
               >
-                <Trophy :size="15" />
+                <RouterLink :to="{ name: 'achievements' }">
+                  <Trophy :size="15" />
+                </RouterLink>
               </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('components.appHeader.achievements') }}</TooltipContent>
@@ -746,10 +765,12 @@ function resultFormatEntries(result: GlobalSearchResult) {
                     <ExternalLink :size="12" class="ml-auto text-muted-foreground" />
                   </a>
                 </DropdownMenuItem>
-                <DropdownMenuItem @click="navigateToWhatsNew">
-                  <Sparkles :size="14" class="mr-2 text-muted-foreground" />
-                  {{ t('components.appHeader.whatsNew') }}
-                  <span v-if="hasUnseenWhatsNew" class="ml-auto h-1.5 w-1.5 rounded-full bg-primary" :aria-label="t('components.appHeader.new')" />
+                <DropdownMenuItem as-child>
+                  <RouterLink :to="{ name: 'whats-new' }">
+                    <Sparkles :size="14" class="mr-2 text-muted-foreground" />
+                    {{ t('components.appHeader.whatsNew') }}
+                    <span v-if="hasUnseenWhatsNew" class="ml-auto h-1.5 w-1.5 rounded-full bg-primary" :aria-label="t('components.appHeader.new')" />
+                  </RouterLink>
                 </DropdownMenuItem>
                 <DropdownMenuItem @click="openLegalNotices">
                   <Info :size="14" class="mr-2 text-muted-foreground" />
@@ -845,14 +866,16 @@ function resultFormatEntries(result: GlobalSearchResult) {
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
+                as-child
                 data-tour="settings-nav"
                 variant="ghost"
                 size="icon"
                 :class="controlClass"
                 :aria-label="t('components.appHeader.settings')"
-                @click="navigateToSettings"
               >
-                <Settings :size="15" />
+                <RouterLink :to="{ name: 'settings-libraries' }">
+                  <Settings :size="15" />
+                </RouterLink>
               </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('components.appHeader.settings') }}</TooltipContent>
@@ -880,9 +903,11 @@ function resultFormatEntries(result: GlobalSearchResult) {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem @click="navigateToAccount">
-              <User :size="13" class="mr-2 text-muted-foreground" />
-              {{ t('components.appHeader.account') }}
+            <DropdownMenuItem as-child>
+              <RouterLink :to="{ name: 'settings-account' }">
+                <User :size="13" class="mr-2 text-muted-foreground" />
+                {{ t('components.appHeader.account') }}
+              </RouterLink>
             </DropdownMenuItem>
             <DropdownMenuSeparator v-if="canChangePassword" />
             <DropdownMenuItem v-if="canChangePassword" @click="openChangePassword()">

@@ -6,7 +6,6 @@ import BookCoverSurface from './BookCoverSurface.vue'
 import { api } from '@/lib/api'
 import { computed, inject, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import {
   BookOpen,
   Check,
@@ -39,11 +38,11 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { displayPublishedDate } from '../lib/published-date'
 import { bookFormatEntries, formatKeyCode, type BookFormatEntry } from '@/features/book/lib/book-formats'
 import { formatChipStyle } from '@/features/book/lib/format-colors'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 
 const COLLAPSED_SERIES_COVER_LIMIT = 3
 
 const { t } = useI18n()
-const router = useRouter()
 
 const props = defineProps<{
   book: BookCard
@@ -87,7 +86,8 @@ const collapsedProgressPercent = computed(() => {
   return Math.min(100, Math.max(0, (collapsedReadCount.value / collapsedBookCount.value) * 100))
 })
 const authorLine = computed(() => props.book.authors.join(', ') || null)
-const authorQuery = computed(() => props.book.authors[0] ?? null)
+const primaryAuthorId = computed(() => props.book.authorIds?.[0] ?? null)
+const authorRoute = computed(() => (primaryAuthorId.value == null ? null : { name: 'author-detail', params: { id: primaryAuthorId.value } }))
 const seriesLine = computed(() => {
   if (!props.book.seriesName) return null
   const idx = props.book.seriesIndex
@@ -140,12 +140,12 @@ const { refreshing, refreshWithFeedback } = useRefreshMetadata()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const coverAspectRatio = computed(() => props.book.coverAspectRatio ?? injectedCoverAspectRatio.value)
 
-function openFile(file: BookFileRef, mode?: 'peek') {
-  router.push({
+function readerRoute(file: BookFileRef, mode?: 'peek') {
+  return {
     name: 'reader',
     params: { bookId: props.book.id, fileId: file.id },
     query: mode === 'peek' ? { format: file.format ?? 'epub', mode } : { format: file.format ?? 'epub' },
-  })
+  }
 }
 
 function formatButtonClasses(entry: BookFormatEntry): string {
@@ -163,24 +163,13 @@ function formatButtonTooltip(entry: BookFormatEntry): string {
   return entry.readAlong ? t('book.actions.openReadAlong') : t('book.actions.openAs', { format: formatKeyCode(entry.key) })
 }
 
-function peekPrimaryFile() {
-  if (!primaryFile.value || isMissing.value) return
-  openFile(primaryFile.value, 'peek')
-}
-
-function openAuthorBrowse() {
-  if (!authorQuery.value) return
-  void router.push({ name: 'authors', query: { q: authorQuery.value } })
-}
-
-function openBookDetails() {
-  void router.push({ name: 'book-detail', params: { bookId: props.book.id } })
-}
-
-function openSeriesDetails() {
-  if (props.book.seriesId == null) return
-  void router.push({ name: 'series-detail', params: { seriesId: props.book.seriesId } })
-}
+const bookDetailRoute = computed(() => ({ name: 'book-detail', params: { bookId: props.book.id } }))
+const seriesDetailRoute = computed(() => (props.book.seriesId == null ? null : { name: 'series-detail', params: { seriesId: props.book.seriesId } }))
+const rowRoute = computed(() => {
+  if (props.selectionMode) return null
+  if (isCollapsedSeries.value) return seriesDetailRoute.value
+  return thumbnailClickAction.value === 'details' ? bookDetailRoute.value : null
+})
 
 function collapsedCoverVersion(bookId: number): string | null | undefined {
   if (bookId === props.book.id) return props.book.coverVersion
@@ -197,18 +186,12 @@ function handleRowClick(event: MouseEvent) {
     emit('select', event)
     return
   }
+  if (!isPlainPrimaryClick(event)) return
+  if (event.target instanceof Element && event.target.closest('a, button')) return
 
-  if (isCollapsedSeries.value) {
-    openSeriesDetails()
-    return
+  if (!isCollapsedSeries.value && thumbnailClickAction.value !== 'details') {
+    emit('action', 'quick-view')
   }
-
-  if (thumbnailClickAction.value === 'details') {
-    openBookDetails()
-    return
-  }
-
-  emit('action', 'quick-view')
 }
 </script>
 
@@ -216,13 +199,29 @@ function handleRowClick(event: MouseEvent) {
   <div
     v-if="isCollapsedSeries"
     data-testid="collapsed-series-list-row"
-    class="flex items-center gap-3 py-3 px-2 rounded-md transition-colors"
+    class="relative flex items-center gap-3 py-3 px-2 rounded-md transition-colors"
     :class="[
       selectionMode ? 'cursor-default select-none' : canOpenSeries ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default',
       selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
     ]"
     @click="handleRowClick"
   >
+    <RouterLink
+      v-if="rowRoute"
+      :to="rowRoute"
+      class="absolute inset-0 z-10 rounded-md"
+      tabindex="-1"
+      aria-hidden="true"
+      data-testid="collapsed-series-list-row-link"
+    />
+
+    <div
+      v-if="selectionMode"
+      class="h-5 w-5 rounded-xs shrink-0 flex items-center justify-center transition-colors"
+      :class="selected ? 'bg-primary' : 'border border-border bg-background'"
+    >
+      <Check v-if="selected" class="text-primary-foreground" :size="12" />
+    </div>
     <div :class="collapsedCoverContainerClass">
       <template v-if="collapsedCoverIds.length > 0">
         <BookCoverSurface
@@ -263,14 +262,26 @@ function handleRowClick(event: MouseEvent) {
 
     <div class="flex min-w-0 flex-1 flex-col gap-1">
       <div class="flex min-w-0 items-center gap-2">
-        <span class="truncate text-sm font-semibold leading-snug text-foreground">{{ collapsedSeriesName }}</span>
+        <RouterLink
+          v-if="!selectionMode && seriesDetailRoute"
+          :to="seriesDetailRoute"
+          class="relative z-20 truncate text-sm font-semibold leading-snug text-foreground hover:underline"
+        >
+          {{ collapsedSeriesName }}
+        </RouterLink>
+        <span v-else class="truncate text-sm font-semibold leading-snug text-foreground">{{ collapsedSeriesName }}</span>
         <span class="hidden shrink-0 rounded-sm bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary sm:inline-flex">
           {{ t('book.collapsedSeries.label') }}
         </span>
       </div>
-      <button v-if="authorLine" class="w-fit max-w-full truncate text-xs text-muted-foreground hover:underline" @click.stop="openAuthorBrowse">
+      <RouterLink
+        v-if="authorLine && authorRoute && !selectionMode"
+        :to="authorRoute"
+        class="relative z-20 w-fit max-w-full truncate text-xs text-muted-foreground hover:underline"
+      >
         {{ authorLine }}
-      </button>
+      </RouterLink>
+      <span v-else-if="authorLine" class="w-fit max-w-full truncate text-xs text-muted-foreground">{{ authorLine }}</span>
       <div class="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
         <LibraryBig class="size-3.5 shrink-0 text-muted-foreground" />
         <span class="truncate">{{ collapsedCountLabel }}</span>
@@ -293,7 +304,7 @@ function handleRowClick(event: MouseEvent) {
   </div>
   <div
     v-else
-    class="flex items-center gap-3 py-3 px-2 rounded-md transition-colors cursor-pointer"
+    class="relative flex items-center gap-3 py-3 px-2 rounded-md transition-colors cursor-pointer"
     :class="[
       selectionMode ? 'cursor-pointer select-none' : '',
       selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
@@ -301,6 +312,15 @@ function handleRowClick(event: MouseEvent) {
     ]"
     @click="handleRowClick"
   >
+    <RouterLink
+      v-if="rowRoute"
+      :to="rowRoute"
+      class="absolute inset-0 z-10 rounded-md"
+      tabindex="-1"
+      aria-hidden="true"
+      data-testid="book-list-row-link"
+    />
+
     <!-- Selection checkbox -->
     <div
       v-if="selectionMode"
@@ -336,10 +356,34 @@ function handleRowClick(event: MouseEvent) {
 
     <!-- Main info -->
     <div class="flex flex-col min-w-0 flex-1 gap-0.5">
-      <span class="text-sm font-medium text-foreground truncate leading-snug" :class="isMissing ? 'opacity-60' : ''">{{ book.title ?? '-' }}</span>
-      <button v-if="authorLine" class="w-fit max-w-full text-xs text-muted-foreground truncate hover:underline" @click.stop="openAuthorBrowse">
-        {{ authorLine }}
+      <RouterLink
+        v-if="!selectionMode && thumbnailClickAction === 'details'"
+        :to="bookDetailRoute"
+        class="relative z-20 w-fit max-w-full text-sm font-medium text-foreground truncate leading-snug hover:underline"
+        :class="isMissing ? 'opacity-60' : ''"
+      >
+        {{ book.title ?? '-' }}
+      </RouterLink>
+      <button
+        v-else-if="!selectionMode"
+        type="button"
+        class="relative z-20 w-fit max-w-full text-left text-sm font-medium text-foreground truncate leading-snug hover:underline"
+        :class="isMissing ? 'opacity-60' : ''"
+        @click.stop="emit('action', 'quick-view')"
+      >
+        {{ book.title ?? '-' }}
       </button>
+      <span v-else class="text-sm font-medium text-foreground truncate leading-snug" :class="isMissing ? 'opacity-60' : ''">{{
+        book.title ?? '-'
+      }}</span>
+      <RouterLink
+        v-if="authorLine && authorRoute && !selectionMode"
+        :to="authorRoute"
+        class="relative z-20 w-fit max-w-full text-xs text-muted-foreground truncate hover:underline"
+      >
+        {{ authorLine }}
+      </RouterLink>
+      <span v-else-if="authorLine" class="w-fit max-w-full text-xs text-muted-foreground truncate">{{ authorLine }}</span>
       <span v-if="seriesLine" class="text-xs text-muted-foreground truncate italic">{{ seriesLine }}</span>
       <span v-if="metaLine" class="text-xs text-muted-foreground truncate">{{ metaLine }}</span>
       <div v-if="visibleTags.length > 0" class="flex items-center gap-1 flex-wrap">
@@ -356,7 +400,7 @@ function handleRowClick(event: MouseEvent) {
     </div>
 
     <!-- Right badges + actions -->
-    <div v-if="!selectionMode" class="flex items-center gap-1.5 shrink-0" @click.stop>
+    <div v-if="!selectionMode" class="relative z-20 flex items-center gap-1.5 shrink-0" @click.stop>
       <!-- Star rating -->
       <div class="hidden sm:flex items-center gap-0.5" @mouseleave="hoverRating = null">
         <Tooltip v-for="star in RATING_STARS" :key="star">
@@ -381,16 +425,16 @@ function handleRowClick(event: MouseEvent) {
         <template v-if="!isMissing">
           <Tooltip v-for="entry in formatEntries" :key="entry.key">
             <TooltipTrigger as-child>
-              <button
+              <RouterLink
+                :to="readerRoute(entry.files[0]!)"
                 class="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-xs"
                 :class="formatButtonClasses(entry)"
                 :style="formatButtonStyle(entry)"
                 :aria-label="formatButtonTooltip(entry)"
-                @click="openFile(entry.files[0]!)"
               >
                 <span aria-hidden="true">{{ formatKeyCode(entry.key) }}</span>
                 <Headphones v-if="entry.readAlong" class="size-2.5 shrink-0" :stroke-width="2.5" aria-hidden="true" />
-              </button>
+              </RouterLink>
             </TooltipTrigger>
             <TooltipContent>{{ formatButtonTooltip(entry) }}</TooltipContent>
           </Tooltip>
@@ -404,11 +448,23 @@ function handleRowClick(event: MouseEvent) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem :disabled="!primaryFile || isMissing" @click="primaryFile && !isMissing && openFile(primaryFile)">
+          <DropdownMenuItem v-if="primaryFile && !isMissing" as-child>
+            <RouterLink :to="readerRoute(primaryFile)">
+              <BookOpen class="size-4 mr-2" />
+              {{ t('book.actions.read') }}
+            </RouterLink>
+          </DropdownMenuItem>
+          <DropdownMenuItem v-else disabled>
             <BookOpen class="size-4 mr-2" />
             {{ t('book.actions.read') }}
           </DropdownMenuItem>
-          <DropdownMenuItem :disabled="!primaryFile || isMissing" @click="peekPrimaryFile">
+          <DropdownMenuItem v-if="primaryFile && !isMissing" as-child>
+            <RouterLink :to="readerRoute(primaryFile, 'peek')">
+              <Eye class="size-4 mr-2" />
+              {{ t('book.actions.peek') }}
+            </RouterLink>
+          </DropdownMenuItem>
+          <DropdownMenuItem v-else disabled>
             <Eye class="size-4 mr-2" />
             {{ t('book.actions.peek') }}
           </DropdownMenuItem>
@@ -416,17 +472,18 @@ function handleRowClick(event: MouseEvent) {
             <PanelRight class="size-4 mr-2" />
             {{ t('book.actions.quickView') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="openBookDetails">
-            <ExternalLink class="size-4 mr-2" />
-            {{ t('book.actions.bookDetails') }}
+          <DropdownMenuItem as-child>
+            <RouterLink :to="bookDetailRoute">
+              <ExternalLink class="size-4 mr-2" />
+              {{ t('book.actions.bookDetails') }}
+            </RouterLink>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            v-if="hasPermission('library_edit_metadata')"
-            @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })"
-          >
-            <Pencil class="size-4 mr-2" />
-            {{ t('book.actions.editMetadata') }}
+          <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" as-child>
+            <RouterLink :to="{ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } }">
+              <Pencil class="size-4 mr-2" />
+              {{ t('book.actions.editMetadata') }}
+            </RouterLink>
           </DropdownMenuItem>
           <DropdownMenuItem v-if="hasPermission('library_edit_metadata')" :disabled="refreshing" @click="refreshWithFeedback(book.id)">
             <Loader2 v-if="refreshing" class="size-4 mr-2 animate-spin" />

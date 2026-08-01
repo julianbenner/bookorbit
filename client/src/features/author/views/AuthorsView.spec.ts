@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import type { AuthorSummary } from '@bookorbit/types'
 import type { AuthorListSort, SortDirection } from '../types/author'
+import type * as VueRouter from 'vue-router'
 import AuthorsView from './AuthorsView.vue'
 import AuthorFilterChips from '../components/AuthorFilterChips.vue'
 
@@ -19,7 +20,6 @@ function author(id: number, name: string, extra: Partial<AuthorSummary> = {}): A
 
 const mocks = vi.hoisted(() => ({
   route: { params: {} as Record<string, string>, query: {} as Record<string, unknown>, fullPath: '/authors' },
-  routerPush: vi.fn<(to: unknown) => Promise<void>>(),
   routerReplace: vi.fn<(to: unknown) => Promise<void>>(),
   fetchLibraries: vi.fn<() => Promise<void>>(),
   load: vi.fn<(reset?: boolean) => Promise<void>>(),
@@ -48,10 +48,14 @@ vi.mock('../api/author', async (importOriginal) => ({
   bulkRefreshAuthorsMetadata: mocks.bulkRefresh,
 }))
 
-vi.mock('vue-router', () => ({
-  useRoute: () => mocks.route,
-  useRouter: () => ({ push: mocks.routerPush, replace: mocks.routerReplace }),
-}))
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof VueRouter>()
+  return {
+    ...actual,
+    useRoute: () => mocks.route,
+    useRouter: () => ({ replace: mocks.routerReplace }),
+  }
+})
 
 vi.mock('vue-sonner', () => ({
   toast: { success: vi.fn<(message: string) => void>(), error: vi.fn<(message: string) => void>(), warning: vi.fn<(message: string) => void>() },
@@ -143,7 +147,6 @@ describe('AuthorsView', () => {
   beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
     mocks.route.query = {}
-    mocks.routerPush.mockResolvedValue()
     mocks.routerReplace.mockResolvedValue()
     mocks.fetchLibraries.mockResolvedValue()
     mocks.load.mockResolvedValue()

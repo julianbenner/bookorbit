@@ -371,6 +371,7 @@ function makeBookCard(id: number, overrides?: Record<string, unknown>) {
     title: `Book ${id}`,
     subtitle: null,
     authors: ['Author'],
+    authorIds: [1],
     seriesName: null,
     seriesIndex: null,
     files: [{ id: id * 10, format: 'epub', role: 'primary', sizeBytes: 123 }],
@@ -3401,7 +3402,7 @@ describe('BookService', () => {
             rating: null,
           },
         ],
-        authorRows: [{ bookId: 10, name: 'Frank Herbert' }],
+        authorRows: [{ bookId: 10, authorId: 1, name: 'Frank Herbert' }],
         fileRows: [{ bookId: 10, id: 1, format: 'epub', role: 'primary' }],
         genreRows: [{ bookId: 10, name: 'Sci-Fi' }],
         progressRows: [{ bookFileId: 1, percentage: 10 }],
@@ -3427,6 +3428,7 @@ describe('BookService', () => {
       expect(result.page).toBe(1);
       expect(result.size).toBe(5);
       expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({ authors: ['Frank Herbert'], authorIds: [1] });
     });
 
     it('queryForLibrary routes to findCardsCollapsed when collapseSeries is true', async () => {

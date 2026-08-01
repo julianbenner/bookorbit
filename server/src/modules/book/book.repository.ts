@@ -638,7 +638,7 @@ export class BookRepository {
 
     if (bookIds.length === 0) {
       return {
-        authorRows: [] as { bookId: number; name: string }[],
+        authorRows: [] as { bookId: number; authorId: number; name: string }[],
         fileRows: [] as {
           bookId: number;
           id: number;
@@ -676,11 +676,11 @@ export class BookRepository {
     // Three small batches retain useful parallelism without allowing one request to claim nine connections.
     const [authorRows, unrankedFileRows, genreRows] = await Promise.all([
       this.db
-        .select({ bookId: bookAuthors.bookId, name: authors.name })
+        .select({ bookId: bookAuthors.bookId, authorId: authors.id, name: authors.name })
         .from(bookAuthors)
         .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
         .where(inArray(bookAuthors.bookId, bookIds))
-        .orderBy(bookAuthors.displayOrder),
+        .orderBy(asc(bookAuthors.bookId), asc(bookAuthors.displayOrder), asc(bookAuthors.authorId)),
       this.db
         .select({
           bookId: bookFiles.bookId,
@@ -854,7 +854,7 @@ export class BookRepository {
       latestVolumeBookId: number | null;
       firstUnreadBookId: number | null;
     }>;
-    authorRows: { bookId: number; name: string }[];
+    authorRows: { bookId: number; authorId: number; name: string }[];
     fileRows: {
       bookId: number;
       id: number;
@@ -1449,7 +1449,7 @@ export class BookRepository {
         .from(bookAuthors)
         .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
         .where(eq(bookAuthors.bookId, id))
-        .orderBy(bookAuthors.displayOrder),
+        .orderBy(asc(bookAuthors.displayOrder), asc(bookAuthors.authorId)),
       this.db.select({ name: genres.name }).from(bookGenres).innerJoin(genres, eq(genres.id, bookGenres.genreId)).where(eq(bookGenres.bookId, id)),
       this.db.select({ name: tags.name }).from(bookTags).innerJoin(tags, eq(tags.id, bookTags.tagId)).where(eq(bookTags.bookId, id)),
       this.db

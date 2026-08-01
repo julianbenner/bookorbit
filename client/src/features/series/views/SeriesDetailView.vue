@@ -213,8 +213,9 @@ function handleGroupByMediaUpdate(value: boolean) {
 }
 
 function goBack() {
-  if (window.history.length > 1 && route.query.from) {
-    void router.push(route.query.from as string)
+  const from = typeof route.query.from === 'string' ? route.query.from : ''
+  if (from.startsWith('/series')) {
+    void router.push(from)
     return
   }
   void router.push({ name: 'series' })

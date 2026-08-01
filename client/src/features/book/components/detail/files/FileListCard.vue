@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { ChevronDown, MoreVertical } from '@lucide/vue'
 import { formatBytes } from '@/lib/formatting'
 import { formatPercent } from '@/i18n/formatters'
@@ -21,11 +22,11 @@ const props = defineProps<{
   canDownload: boolean
   canEdit: boolean
   canDelete: boolean
+  readerRoute: (file: TreeFile) => RouteLocationRaw
 }>()
 
 const emit = defineEmits<{
   select: [id: number]
-  open: [file: TreeFile]
   download: [file: TreeFile]
   rename: [file: TreeFile]
   remove: [file: TreeFile]
@@ -73,11 +74,6 @@ function toggleGroup(group: FileGroup) {
   expandedGroups.value = next
 }
 
-function playGroup(group: FileGroup) {
-  const first = group.files[0]
-  if (first) emit('open', first)
-}
-
 function revealAllTracks(group: FileGroup) {
   showAllTracks.value = new Set(showAllTracks.value).add(group.key)
 }
@@ -117,9 +113,6 @@ const GROUP_ACCENT: Record<string, string> = {
 
 function handleSelect(file: TreeFile) {
   emit('select', file.id)
-}
-function handleOpen(file: TreeFile) {
-  emit('open', file)
 }
 function handleDownload(file: TreeFile) {
   emit('download', file)
@@ -194,12 +187,12 @@ function handleCopyPath(file: TreeFile) {
             {{ formatBytes(groupBytes(group)) }}
           </span>
           <span class="flex shrink-0 items-center justify-end gap-1.5">
-            <button
+            <RouterLink
+              :to="readerRoute(group.files[0]!)"
               class="inline-flex h-7 min-w-[3.5rem] items-center justify-center gap-1.5 rounded-md bg-primary px-2.5 text-[12.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              @click="playGroup(group)"
             >
               {{ t('book.detail.files.play') }}
-            </button>
+            </RouterLink>
           </span>
         </div>
 
@@ -245,18 +238,18 @@ function handleCopyPath(file: TreeFile) {
             </span>
 
             <span class="relative flex shrink-0 items-center justify-end gap-1.5">
-              <button
+              <RouterLink
                 v-if="file.openable"
+                :to="readerRoute(file)"
                 class="inline-flex h-7 min-w-[3.5rem] items-center justify-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 :class="
                   file.id === selectedId
                     ? 'bg-primary text-primary-foreground hover:bg-primary/90'
                     : 'border border-input text-foreground hover:bg-muted'
                 "
-                @click="handleOpen(file)"
               >
                 {{ file.isAudio ? t('book.detail.files.play') : progressOf(file) > 0 ? t('book.detail.files.resume') : t('book.detail.files.read') }}
-              </button>
+              </RouterLink>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
                   <button

@@ -191,6 +191,8 @@ export type BookCard = {
   coverAspectRatio: CoverAspectRatio;
   title: string | null;
   authors: string[];
+  /** IDs in the same display order as authors, with one ID per name. */
+  authorIds: number[];
   seriesId?: number | null;
   seriesName: string | null;
   seriesIndex: SeriesIndex | null;

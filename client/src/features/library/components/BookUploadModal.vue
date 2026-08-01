@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { CheckCircle2, FileUp, Loader2, Plus, RotateCcw, Upload, X, XCircle } from '@lucide/vue'
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
@@ -9,6 +9,7 @@ import { emitLibraryUploadCompleted } from '../composables/useLibraryUploadEvent
 import { useBookDestination } from '../composables/useBookDestination'
 import BookDestinationFields from './BookDestinationFields.vue'
 import { formatBytes } from '@/lib/formatting'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 const props = defineProps<{
   libraryId?: number
 }>()
@@ -18,7 +19,6 @@ const emit = defineEmits<{
   uploaded: [bookIds: number[]]
 }>()
 
-const router = useRouter()
 const { t } = useI18n()
 const destination = useBookDestination({ libraryId: props.libraryId })
 const { libraryId: selectedLibraryId, folderId: selectedFolderId, selectedLibrary, hasDestination, fetchLibraries } = destination
@@ -69,10 +69,8 @@ function handleClose() {
   emit('close')
 }
 
-function goToLibrary() {
-  if (selectedLibraryId.value) {
-    router.push({ name: 'library', params: { id: selectedLibraryId.value } })
-  }
+function handleLibraryNavigation(event: MouseEvent) {
+  if (!isPlainPrimaryClick(event)) return
   handleClose()
 }
 
@@ -319,12 +317,14 @@ function formatPillClass(filename: string): string {
             >
               {{ t('common.close') }}
             </button>
-            <button
+            <RouterLink
+              v-if="selectedLibraryId !== null"
+              :to="{ name: 'library', params: { id: selectedLibraryId } }"
               class="flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-              @click="goToLibrary"
+              @click="handleLibraryNavigation"
             >
               {{ t('library.upload.viewInLibrary') }}
-            </button>
+            </RouterLink>
           </div>
         </div>
 

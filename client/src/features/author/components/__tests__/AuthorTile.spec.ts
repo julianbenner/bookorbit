@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import type { AuthorSummary } from '@bookorbit/types'
 import AuthorTile from '../AuthorTile.vue'
 
@@ -7,10 +8,23 @@ function author(overrides: Partial<AuthorSummary> = {}): AuthorSummary {
   return { id: 1, name: 'Blake Crouch', sortName: null, bookCount: 3, lastAddedAt: null, coverBookId: null, ...overrides }
 }
 
-function mountTile(props: Record<string, unknown> = {}) {
+const authorTarget = { name: 'author-detail', params: { id: 1 }, query: { from: '/authors' } }
+
+function mountTile(
+  props: Record<string, unknown> = {},
+  router: Router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', component: { template: '<div />' } },
+      { path: '/authors', component: { template: '<div />' } },
+      { path: '/authors/:id', name: 'author-detail', component: { template: '<div />' } },
+    ],
+  }),
+) {
   return mount(AuthorTile, {
-    props: { author: author(), ...props },
+    props: { author: author(), to: authorTarget, ...props },
     global: {
+      plugins: [router],
       mocks: { $t: (key: string) => key },
       stubs: {
         DropdownMenu: { template: '<div><slot /></div>' },
@@ -24,15 +38,19 @@ function mountTile(props: Record<string, unknown> = {}) {
 }
 
 describe('AuthorTile', () => {
-  it('stretches the activate button over the whole tile, not just the artwork', () => {
+  it('stretches the activate target over the whole tile, not just the artwork', () => {
     const wrapper = mountTile()
     const root = wrapper.element as HTMLElement
-    const activate = wrapper.get('button.inset-0')
+    const link = wrapper.get('a.inset-0')
 
     // Sizing the target to the artwork leaves every corner of a circular tile dead
     // and never lets anyone click the name.
-    expect(activate.element.parentElement).toBe(root)
-    expect(activate.classes()).toContain('inset-0')
+    expect(link.element.parentElement).toBe(root)
+    expect(link.classes()).toContain('inset-0')
+
+    const selecting = mountTile({ selectionMode: true })
+    const activate = selecting.get('button.inset-0')
+    expect(activate.element.parentElement).toBe(selecting.element as HTMLElement)
   })
 
   it('keeps the actions menu out of the clipped artwork so the hover transform cannot bury it', () => {
@@ -87,18 +105,43 @@ describe('AuthorTile', () => {
     expect(status.element.className).not.toContain('group-hover')
   })
 
-  it('emits select rather than open while in selection mode', async () => {
+  it('selects instead of navigating while in selection mode', async () => {
     const wrapper = mountTile({ selectionMode: true })
     await wrapper.get('button.inset-0').trigger('click')
 
     expect(wrapper.emitted('select')).toHaveLength(1)
-    expect(wrapper.emitted('open')).toBeUndefined()
+    expect(wrapper.find('a').exists()).toBe(false)
   })
 
-  it('opens the author on a plain click', async () => {
+  it('navigates to the author and retains the list return path on a plain click', async () => {
     const wrapper = mountTile()
-    await wrapper.get('button.inset-0').trigger('click')
+    await flushPromises()
 
-    expect(wrapper.emitted('open')?.[0]).toEqual([1])
+    const link = wrapper.get('a.inset-0')
+    const href = link.attributes('href')
+    expect(href).toBe('/authors/1?from=/authors')
+    await link.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.$router.currentRoute.value.fullPath).toBe(href)
+    expect(wrapper.emitted('select')).toBeUndefined()
+    expect(link.element.querySelector('button, a')).toBeNull()
   })
+
+  it.each([{ button: 1 }, { button: 0, ctrlKey: true }, { button: 0, metaKey: true }, { button: 0, shiftKey: true }, { button: 0, altKey: true }])(
+    'leaves native link activation to the browser (%o)',
+    async (options) => {
+      const wrapper = mountTile()
+      await flushPromises()
+      const initialPath = wrapper.vm.$router.currentRoute.value.fullPath
+      const event = new MouseEvent('click', { ...options, bubbles: true, cancelable: true })
+
+      wrapper.get('a.inset-0').element.dispatchEvent(event)
+      await flushPromises()
+
+      expect(event.defaultPrevented).toBe(false)
+      expect(wrapper.vm.$router.currentRoute.value.fullPath).toBe(initialPath)
+      expect(wrapper.emitted('select')).toBeUndefined()
+    },
+  )
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
-import { defineComponent, nextTick, ref, type Ref } from 'vue'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { defineComponent, h, nextTick, ref, type Ref } from 'vue'
+import { createMemoryHistory, createRouter, RouterLink } from 'vue-router'
 
 import { useRouteTab } from '../useRouteTab'
 
@@ -35,7 +35,7 @@ async function mountTab(options: { routeName?: string; available?: Ref<readonly 
     defineComponent({
       setup() {
         api = useRouteTab<Tab>({ routeName: options.routeName, normalize, availableTabs, fallback: 'search' })
-        return () => null
+        return () => h(RouterLink, { to: api.tabTarget('mine'), replace: true }, () => 'Mine')
       },
     }),
     { global: { plugins: [router] } },
@@ -101,5 +101,35 @@ describe('useRouteTab', () => {
     await settle()
 
     expect(router.currentRoute.value.name).toBe('requests')
+  })
+
+  it('keeps the child route, unrelated query and fragment when following a tab link', async () => {
+    const { router, wrapper, api } = await mountTab({ start: '/requests/34?tab=search&filter=ready#queue' })
+    await settle()
+    const link = wrapper.get('a')
+
+    await link.trigger('auxclick', { button: 1 })
+    for (const modifiers of [{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }]) {
+      await link.trigger('click', modifiers)
+    }
+    await settle()
+    expect(api.activeTab.value).toBe('search')
+    expect(router.currentRoute.value.fullPath).toBe('/requests/34?tab=search&filter=ready#queue')
+
+    await link.trigger('click')
+    await settle()
+    expect(api.activeTab.value).toBe('mine')
+    expect(router.currentRoute.value.fullPath).toBe('/requests/34?tab=mine&filter=ready#queue')
+  })
+
+  it('keeps the query and fragment when following a tab link to the named route', async () => {
+    const { router, wrapper, api } = await mountTab({ routeName: 'requests', start: '/requests/34?tab=search&filter=ready#queue' })
+    await settle()
+
+    await wrapper.get('a').trigger('click')
+    await settle()
+
+    expect(api.activeTab.value).toBe('mine')
+    expect(router.currentRoute.value.fullPath).toBe('/requests?tab=mine&filter=ready#queue')
   })
 })

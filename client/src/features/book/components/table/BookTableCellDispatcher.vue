@@ -39,7 +39,7 @@ const props = defineProps<{
   searchFn?: (q: string) => Promise<string[]>
   openLink?: string | null
   openLinkLabel?: string | null
-  linkFn?: (chip: string) => string | null
+  linkFn?: (chip: string, index: number) => string | null
   chipActionFn?: (chip: string) => void
   allowDecimal?: boolean
 }>()

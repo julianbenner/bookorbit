@@ -44,6 +44,17 @@ For the development setup, see [DEVELOPMENT.md](DEVELOPMENT.md).
 Coverage excluded on the server: test files, `*.module.ts`, `main.ts`, `src/db/schema/**`,
 type definitions, interfaces, constants, enums, config files, and scripts.
 
+### Native navigation
+
+Verify links in the running app, not only with `RouterLink` stubs:
+
+- Middle-click and Ctrl/Cmd-click open the intended destination while the source view stays usable. Right-click offers the browser's link menu.
+- Ordinary activation performs the existing dismissal; modified activation keeps quick views, file pickers, and mobile sidebars open.
+- Keyboard focus can move from global search into its results without dismissing them.
+- Detail tabs preserve return paths, filters, and hashes. A detail page opened in a fresh tab can return to its source list.
+- Selection mode selects rather than navigates, including Shift range selection and Ctrl/Cmd selection. Missing destinations remain non-interactive.
+- Reader and Peek links retain their file ID, format, and mode. Use Peek for live-library smoke checks to avoid creating reading progress.
+
 ---
 
 ## End-to-End Tests

@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button'
 import { computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { ArrowLeft, BookOpen, ShieldCheck } from '@lucide/vue'
 import type { BroadReadingGenre } from '@bookorbit/types'
 
@@ -11,7 +11,6 @@ import { useSharedReadingInsights } from './composables/useSharedReadingInsights
 
 const props = defineProps<{ userId: number }>()
 const { t } = useI18n()
-const router = useRouter()
 const insights = useSharedReadingInsights(() => props.userId)
 const rankedGroups = computed(() => {
   const detail = insights.detail.value
@@ -52,10 +51,6 @@ const trendMaxSeconds = computed(() => Math.max(...trendPoints.value.map((point)
 onMounted(insights.initialize)
 watch(() => props.userId, insights.initialize)
 
-function handleBack() {
-  router.push({ name: 'settings-admin-account-activity' })
-}
-
 function handlePeriodChange() {
   void insights.loadInsights()
 }
@@ -89,9 +84,11 @@ function trendWidth(readingSeconds: number): string {
 <template>
   <section class="space-y-4">
     <div class="grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start lg:grid-cols-[auto_minmax(0,1fr)_12rem]">
-      <Button variant="outline" size="sm" type="button" class="justify-self-start sm:mt-0.5" @click="handleBack">
-        <ArrowLeft :size="15" aria-hidden="true" />
-        {{ t('common.back') }}
+      <Button as-child variant="outline" size="sm" class="justify-self-start sm:mt-0.5">
+        <RouterLink :to="{ name: 'settings-admin-account-activity' }">
+          <ArrowLeft :size="15" aria-hidden="true" />
+          {{ t('common.back') }}
+        </RouterLink>
       </Button>
 
       <div class="min-w-0">

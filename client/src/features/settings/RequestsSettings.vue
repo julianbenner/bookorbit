@@ -28,7 +28,7 @@ const tabs = computed(() => [
   { id: 'clients' as const, label: t('settings.system.requests.tabs.clients') },
   { id: 'automation' as const, label: t('settings.system.requests.tabs.automation') },
 ])
-const { activeTab, selectTab } = useRouteTab<Tab>({
+const { activeTab, tabTarget } = useRouteTab<Tab>({
   routeName: 'settings-admin-requests',
   normalize: normalizeTab,
   availableTabs: TABS,
@@ -63,7 +63,7 @@ function handleEncryptionState(configured: boolean) {
       {{ t('settings.system.requests.encryptionKeyMissing') }}
     </p>
 
-    <SettingsTabs :tabs="tabs" :active-tab="activeTab" @select="selectTab" />
+    <SettingsTabs :tabs="tabs" :active-tab="activeTab" :tab-to="tabTarget" />
 
     <RequestIndexersPanel v-if="activeTab === 'sources'" @encryption-state="handleEncryptionState" />
     <DownloadClientsPanel v-else-if="activeTab === 'clients'" @encryption-state="handleEncryptionState" />

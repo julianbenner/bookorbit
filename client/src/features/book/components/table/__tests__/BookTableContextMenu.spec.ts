@@ -10,8 +10,6 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: hasPermissionMock, isDemoRestrictedAccount: { value: false } }),
 }))
 
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn<(to: unknown) => void>() }) }))
-
 vi.mock('@/features/book/composables/useRefreshMetadata', () => ({
   useRefreshMetadata: () => ({ refreshWithFeedback: vi.fn<() => Promise<null>>(), refreshing: { value: false } }),
 }))
@@ -34,7 +32,7 @@ function mountMenu() {
   return mount(BookTableContextMenu, {
     props: { book, position: { x: 100, y: 100 } },
     global: {
-      stubs: { SendBookDialog: true, Teleport: true },
+      stubs: { SendBookDialog: true, Teleport: true, RouterLink: { template: '<a><slot /></a>' } },
     },
   })
 }
@@ -69,4 +67,25 @@ describe('move to library entry', () => {
 
     expect(moveButton(mountMenu())).toBeUndefined()
   })
+})
+
+describe('navigation dismissal', () => {
+  it('closes the context menu on ordinary navigation', async () => {
+    const wrapper = mountMenu()
+
+    await wrapper.findAll('a')[0]!.trigger('click', { button: 0 })
+
+    expect(wrapper.emitted('close')).toHaveLength(1)
+  })
+
+  it.each([{ ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }])(
+    'keeps the menu open for modified navigation %o',
+    async (modifiers) => {
+      const wrapper = mountMenu()
+
+      await wrapper.findAll('a')[0]!.trigger('click', { button: 0, ...modifiers })
+
+      expect(wrapper.emitted('close')).toBeUndefined()
+    },
+  )
 })

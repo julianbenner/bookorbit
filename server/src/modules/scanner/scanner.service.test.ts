@@ -31,7 +31,6 @@ import { findBookCandidates, findLooseFileCandidates, buildSingleBookCandidate }
 import { computeFileHash } from './lib/hash';
 import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
-import * as assembleBookCardsModule from '../book/utils/assemble-book-cards';
 
 const mockFindCandidates = findBookCandidates as MockedFunction<typeof findBookCandidates>;
 const mockFindLooseCandidates = findLooseFileCandidates as MockedFunction<typeof findLooseFileCandidates>;
@@ -3820,24 +3819,58 @@ describe('bootstrap, wrappers, and cover refresh', () => {
     expect(mockMetadata.refreshCoverForBook).toHaveBeenCalledTimes(2);
   });
 
-  it('flushes buffered added books immediately at threshold and emits built cards', async () => {
-    vi.useFakeTimers();
+  it('emits added-book cards with positional author identities', async () => {
     const repo = makeRepo({
-      findBookCardData: vi.fn().mockResolvedValue({ rows: [{ id: 1 }], authorRows: [], fileRows: [], genreRows: [] }),
+      findBookCardData: vi.fn().mockResolvedValue({
+        rows: [
+          {
+            id: 1,
+            status: 'present',
+            coverAspectRatio: '2/3',
+            primaryFileId: 10,
+            folderPath: '/library/Book',
+            addedAt: new Date('2026-01-01T00:00:00.000Z'),
+            title: 'Book',
+            seriesName: null,
+            seriesIndex: null,
+            publishedDate: null,
+            publishedYear: null,
+            language: null,
+            rating: null,
+            coverSource: null,
+            lockedFields: null,
+            subtitle: null,
+            publisher: null,
+            pageCount: null,
+            isbn13: null,
+            hardcoverId: null,
+            hardcoverEditionId: null,
+          },
+        ],
+        authorRows: [
+          { bookId: 1, authorId: 20, name: 'First Author' },
+          { bookId: 1, authorId: 10, name: 'Coauthor' },
+        ],
+        fileRows: [{ bookId: 1, id: 10, format: 'epub', role: 'content', sizeBytes: 123 }],
+        genreRows: [],
+      }),
     });
-    const assembleSpy = vi.spyOn(assembleBookCardsModule, 'assembleBookCards').mockReturnValue([{ id: 1 }] as any);
     const { service } = makeService(repo);
-    const flushSpy = vi.spyOn(service as any, 'flushBookEmitBuffer');
 
-    for (let i = 0; i < 20; i++) {
-      (service as any).bufferBookForEmit(3, i + 1);
-    }
-
-    expect(flushSpy).toHaveBeenCalledWith(3);
     await (service as any).buildAndEmitBookCards(3, [1]);
-    expect(mockGateway.emitBooksAdded).toHaveBeenCalledWith({ libraryId: 3, books: [{ id: 1 }] });
-    expect(assembleSpy).toHaveBeenCalled();
-    vi.useRealTimers();
+
+    expect(mockGateway.emitBooksAdded).toHaveBeenCalledWith({
+      libraryId: 3,
+      books: [
+        expect.objectContaining({
+          id: 1,
+          title: 'Book',
+          authors: ['First Author', 'Coauthor'],
+          authorIds: [20, 10],
+          files: [{ id: 10, format: 'epub', role: 'primary', sizeBytes: 123 }],
+        }),
+      ],
+    });
   });
 
   it('schedules a delayed book buffer flush before the threshold is reached', () => {

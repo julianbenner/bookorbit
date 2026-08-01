@@ -8,6 +8,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     title: 'Test',
     subtitle: null,
     authors: [],
+    authorIds: [],
     genres: [],
     files: [],
     narrators: [],
@@ -126,7 +127,7 @@ describe('mergeBookCardWithDetail', () => {
     expect(mergeBookCardWithDetail(book, makeDetail()).coverAspectRatio).toBe('2/3')
   })
 
-  it('maps authors from detail.authors[].name array', () => {
+  it('maps author names and ids from detail authors', () => {
     const book = makeBook()
     const detail = makeDetail({
       authors: [
@@ -138,6 +139,7 @@ describe('mergeBookCardWithDetail', () => {
     const result = mergeBookCardWithDetail(book, detail)
 
     expect(result.authors).toEqual(['Alice', 'Bob'])
+    expect(result.authorIds).toEqual([1, 2])
   })
 
   it('maps files to BookFileRef (id, format, role, sizeBytes only)', () => {

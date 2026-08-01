@@ -43,7 +43,7 @@ const tabs = computed<{ id: Tab; label: string }[]>(() => {
 })
 
 const availableTabIds = computed(() => tabs.value.map((tab) => tab.id))
-const { activeTab, selectTab } = useRouteTab<Tab>({
+const { activeTab, tabTarget } = useRouteTab<Tab>({
   routeName: 'settings-email',
   normalize: normalizeEmailTab,
   availableTabs: availableTabIds,
@@ -73,7 +73,7 @@ onMounted(async () => {
   </div>
   <div v-else-if="error" class="settings-error-state">{{ error }}</div>
   <template v-else>
-    <SettingsTabs :tabs="tabs" :active-tab="activeTab" @select="selectTab" />
+    <SettingsTabs :tabs="tabs" :active-tab="activeTab" :tab-to="tabTarget" />
 
     <ProvidersTab v-if="activeTab === 'providers'" />
     <RecipientsTab v-else-if="activeTab === 'recipients'" />

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AlertCircle, Check, Layers } from '@lucide/vue'
 import type { SeriesSummary } from '@bookorbit/types'
@@ -11,11 +12,7 @@ import SeriesLibraryChip from './SeriesLibraryChip.vue'
 import { seriesAuthorLine, seriesExtraAuthorCount, seriesRowFacts, seriesCoverSlots } from '../lib/series-summary'
 import { STACK_MAX_VISIBLE, coverStackLayout, orderForStack } from '../lib/cover-stack-layout'
 
-const props = defineProps<{ series: SeriesSummary }>()
-
-const emit = defineEmits<{
-  open: [seriesId: number]
-}>()
+const props = defineProps<{ series: SeriesSummary; to: RouteLocationRaw }>()
 
 const { t } = useI18n()
 const { coverUrl } = useCoverVersions()
@@ -55,109 +52,108 @@ const progressLabel = computed(() =>
 )
 
 const cardLabel = computed(() => t('series.card.label', { name: props.series.name, read: facts.value.readVolumes, total: facts.value.ownedVolumes }))
-
-function handleOpen() {
-  emit('open', props.series.id)
-}
 </script>
 
 <template>
-  <article
-    class="series-card group flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-[border-color,box-shadow] duration-150 hover:border-ring hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-[519px]:flex-row"
-    tabindex="0"
-    role="button"
+  <RouterLink
+    :to="to"
     :aria-label="cardLabel"
-    @click="handleOpen"
-    @keydown.enter="handleOpen"
-    @keydown.space.prevent="handleOpen"
+    class="series-card-link flex h-full min-w-0 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
   >
-    <div
-      class="relative shrink-0 bg-linear-to-b from-surface-2 to-card px-2.5 pt-2 max-[519px]:flex max-[519px]:w-[136px] max-[519px]:flex-col max-[519px]:px-2 max-[519px]:py-2.5"
+    <article
+      class="series-card group flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-[border-color,box-shadow] duration-150 hover:border-ring hover:shadow-lg max-[519px]:flex-row"
     >
-      <div class="cover-stack relative isolate w-full" style="aspect-ratio: 5 / 4">
-        <span class="absolute inset-x-[22%] bottom-[3%] h-3 rounded-full bg-black/25 blur-xl" aria-hidden="true" />
+      <div
+        class="relative shrink-0 bg-linear-to-b from-surface-2 to-card px-2.5 pt-2 max-[519px]:flex max-[519px]:w-[136px] max-[519px]:flex-col max-[519px]:px-2 max-[519px]:py-2.5"
+      >
+        <div class="cover-stack relative isolate w-full" style="aspect-ratio: 5 / 4">
+          <span class="absolute inset-x-[22%] bottom-[3%] h-3 rounded-full bg-black/25 blur-xl" aria-hidden="true" />
 
-        <div
-          v-for="(slot, i) in stackSlots"
-          :key="slot.bookId ?? `s${i}`"
-          class="stack-cover absolute overflow-hidden rounded-[3px] bg-surface-3"
-          :style="stackLayout[i]"
-        >
-          <BookCoverArtwork
-            :src="slot.bookId === null ? null : coverUrl(slot.bookId)"
-            :has-cover="slot.bookId !== null"
-            :title="slot.title ?? series.name"
-            :seed="`${series.name}-${slot.bookId ?? i}`"
-            alt=""
-            mode="fill-crop"
-            loading="lazy"
-            decoding="async"
-          />
+          <div
+            v-for="(slot, i) in stackSlots"
+            :key="slot.bookId ?? `s${i}`"
+            class="stack-cover absolute overflow-hidden rounded-[3px] bg-surface-3"
+            :style="stackLayout[i]"
+          >
+            <BookCoverArtwork
+              :src="slot.bookId === null ? null : coverUrl(slot.bookId)"
+              :has-cover="slot.bookId !== null"
+              :title="slot.title ?? series.name"
+              :seed="`${series.name}-${slot.bookId ?? i}`"
+              alt=""
+              mode="fill-crop"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+
+          <span
+            v-if="facts.ownedVolumes > 1"
+            class="absolute right-1 top-1 z-20 inline-flex h-[21px] items-center gap-1 rounded-md border border-border bg-background/85 px-1.5 text-[11.5px] font-semibold tabular-nums text-foreground backdrop-blur-sm"
+            :title="t('series.card.volumeCount', { count: facts.ownedVolumes })"
+          >
+            <Layers :size="11" class="text-muted-foreground" />
+            {{ formatNumber(facts.ownedVolumes) }}
+          </span>
         </div>
 
-        <span
-          v-if="facts.ownedVolumes > 1"
-          class="absolute right-1 top-1 z-20 inline-flex h-[21px] items-center gap-1 rounded-md border border-border bg-background/85 px-1.5 text-[11.5px] font-semibold tabular-nums text-foreground backdrop-blur-sm"
-          :title="t('series.card.volumeCount', { count: facts.ownedVolumes })"
-        >
-          <Layers :size="11" class="text-muted-foreground" />
-          {{ formatNumber(facts.ownedVolumes) }}
-        </span>
+        <div class="mt-1.5 h-1.5">
+          <SeriesVolumeTrack :series="series" :max-segment-width="40" align="center" />
+        </div>
+
+        <p class="flex min-w-0 items-center gap-1.5 py-2 text-[11.5px] text-muted-foreground max-[519px]:hidden">
+          <span
+            v-if="series.gapCount > 0"
+            class="inline-flex h-[21px] shrink-0 items-center gap-1 rounded-md bg-destructive/15 px-1.5 font-semibold text-destructive"
+          >
+            <AlertCircle :size="12" />
+            {{ t('series.gaps.missingCount', { count: series.gapCount }) }}
+          </span>
+          <span v-if="series.gapCount > 0" class="min-w-0 flex-1 truncate">{{ gapPreview }}</span>
+          <span
+            v-else-if="facts.isComplete"
+            class="inline-flex h-[21px] shrink-0 items-center gap-1 rounded-md bg-success/15 px-1.5 font-semibold text-success"
+          >
+            <Check :size="12" />
+            {{ t('series.card.complete') }}
+          </span>
+          <span v-if="series.gapCount === 0" class="min-w-0 flex-1 truncate" :title="cardNote ?? undefined">{{ cardNote }}</span>
+        </p>
       </div>
 
-      <div class="mt-1.5 h-1.5">
-        <SeriesVolumeTrack :series="series" :max-segment-width="40" align="center" />
+      <div
+        class="flex min-w-0 flex-1 flex-col gap-0.5 border-t border-border px-3 pb-2.5 pt-2.5 max-[519px]:justify-center max-[519px]:border-l max-[519px]:border-t-0"
+      >
+        <h3 class="line-clamp-2 break-words text-[14.5px] font-semibold leading-snug tracking-[-0.014em] text-foreground">{{ series.name }}</h3>
+        <p v-if="authorLine" class="truncate text-[12.5px] text-muted-foreground">
+          {{ extraAuthors > 0 ? t('series.authorsPlus', { authors: authorLine, count: extraAuthors }) : authorLine }}
+        </p>
+
+        <div class="mt-auto flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1.5 pt-2 max-[519px]:mt-1.5 max-[519px]:flex-nowrap">
+          <span
+            v-if="facts.readingVolumes > 0"
+            class="inline-flex h-[21px] shrink-0 items-center rounded-md bg-warning/15 px-1.5 text-[11.5px] font-semibold text-warning"
+          >
+            {{ t('series.status.reading') }}
+          </span>
+          <span
+            v-else-if="facts.isComplete"
+            class="inline-flex h-[21px] shrink-0 items-center gap-1 rounded-md bg-success/15 px-1.5 text-[11.5px] font-semibold text-success"
+          >
+            <Check :size="12" />
+            {{ t('series.status.read') }}
+          </span>
+          <SeriesLibraryChip :library-names="series.libraryNames" class="series-card-library min-w-0" />
+          <span
+            class="ml-auto shrink-0 text-[12.5px] font-semibold tabular-nums"
+            :class="facts.isComplete ? 'text-success' : 'text-muted-foreground'"
+          >
+            {{ progressLabel }}
+          </span>
+        </div>
       </div>
-
-      <p class="flex min-w-0 items-center gap-1.5 py-2 text-[11.5px] text-muted-foreground max-[519px]:hidden">
-        <span
-          v-if="series.gapCount > 0"
-          class="inline-flex h-[21px] shrink-0 items-center gap-1 rounded-md bg-destructive/15 px-1.5 font-semibold text-destructive"
-        >
-          <AlertCircle :size="12" />
-          {{ t('series.gaps.missingCount', { count: series.gapCount }) }}
-        </span>
-        <span v-if="series.gapCount > 0" class="min-w-0 flex-1 truncate">{{ gapPreview }}</span>
-        <span
-          v-else-if="facts.isComplete"
-          class="inline-flex h-[21px] shrink-0 items-center gap-1 rounded-md bg-success/15 px-1.5 font-semibold text-success"
-        >
-          <Check :size="12" />
-          {{ t('series.card.complete') }}
-        </span>
-        <span v-if="series.gapCount === 0" class="min-w-0 flex-1 truncate" :title="cardNote ?? undefined">{{ cardNote }}</span>
-      </p>
-    </div>
-
-    <div
-      class="flex min-w-0 flex-1 flex-col gap-0.5 border-t border-border px-3 pb-2.5 pt-2.5 max-[519px]:justify-center max-[519px]:border-l max-[519px]:border-t-0"
-    >
-      <h3 class="line-clamp-2 break-words text-[14.5px] font-semibold leading-snug tracking-[-0.014em] text-foreground">{{ series.name }}</h3>
-      <p v-if="authorLine" class="truncate text-[12.5px] text-muted-foreground">
-        {{ extraAuthors > 0 ? t('series.authorsPlus', { authors: authorLine, count: extraAuthors }) : authorLine }}
-      </p>
-
-      <div class="mt-auto flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1.5 pt-2 max-[519px]:mt-1.5 max-[519px]:flex-nowrap">
-        <span
-          v-if="facts.readingVolumes > 0"
-          class="inline-flex h-[21px] shrink-0 items-center rounded-md bg-warning/15 px-1.5 text-[11.5px] font-semibold text-warning"
-        >
-          {{ t('series.status.reading') }}
-        </span>
-        <span
-          v-else-if="facts.isComplete"
-          class="inline-flex h-[21px] shrink-0 items-center gap-1 rounded-md bg-success/15 px-1.5 text-[11.5px] font-semibold text-success"
-        >
-          <Check :size="12" />
-          {{ t('series.status.read') }}
-        </span>
-        <SeriesLibraryChip :library-names="series.libraryNames" class="series-card-library min-w-0" />
-        <span class="ml-auto shrink-0 text-[12.5px] font-semibold tabular-nums" :class="facts.isComplete ? 'text-success' : 'text-muted-foreground'">
-          {{ progressLabel }}
-        </span>
-      </div>
-    </div>
-  </article>
+    </article>
+  </RouterLink>
 </template>
 
 <style scoped>
@@ -173,8 +169,8 @@ function handleOpen() {
   transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.series-card:hover .cover-stack,
-.series-card:focus-visible .cover-stack {
+.series-card-link:hover .cover-stack,
+.series-card-link:focus-visible .cover-stack {
   --stack-spread: 7px;
   --stack-tilt: 2.4deg;
 }
@@ -191,8 +187,8 @@ function handleOpen() {
     transition: none;
   }
 
-  .series-card:hover .cover-stack,
-  .series-card:focus-visible .cover-stack {
+  .series-card-link:hover .cover-stack,
+  .series-card-link:focus-visible .cover-stack {
     --stack-spread: 0px;
     --stack-tilt: 0deg;
   }

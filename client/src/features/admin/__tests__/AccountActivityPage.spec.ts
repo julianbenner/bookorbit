@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 
 import AccountActivityPage from '../AccountActivityPage.vue'
 
@@ -9,14 +10,27 @@ vi.mock('@/lib/api', () => ({ api: (input: string) => apiMock(input) }))
 
 const componentStubs = {
   Button: { props: ['variant'], template: '<button :data-variant="variant"><slot /></button>' },
+  RouterLink: false,
 }
 
+let router: Router
+
 function mountPage() {
-  return shallowMount(AccountActivityPage, { global: { stubs: componentStubs } })
+  return shallowMount(AccountActivityPage, { global: { plugins: [router], stubs: componentStubs } })
 }
 
 describe('AccountActivityPage', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    const view = { template: '<div />' }
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/settings/admin/account-activity', name: 'settings-admin-account-activity', component: view },
+        { path: '/settings/admin/account-activity/:userId/insights', name: 'settings-admin-shared-insights', component: view },
+      ],
+    })
+    await router.push('/settings/admin/account-activity')
+    await router.isReady()
     vi.clearAllMocks()
     apiMock.mockImplementation(async (input: string) => {
       if (input === '/api/v1/account-activity/summary') {
@@ -73,10 +87,26 @@ describe('AccountActivityPage', () => {
     expect(wrapper.text()).toContain('Reader')
     expect(wrapper.text()).toContain('No recorded activity')
     expect(wrapper.text()).not.toContain('Details')
-    const insightsButton = wrapper.find('button[aria-label="Open shared reading insights for Maya"]')
-    expect(insightsButton.exists()).toBe(true)
-    expect(wrapper.find('nav').exists()).toBe(false)
+    const insightsLink = wrapper.find('a[aria-label="Open shared reading insights for Maya"]')
+    expect(insightsLink.exists()).toBe(true)
     expect(wrapper.find('table').classes()).toContain('table-fixed')
+  })
+
+  it('opens shared insights without moving the activity page for modified clicks', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+    const link = wrapper.get('a[aria-label="Open shared reading insights for Maya"]')
+
+    await link.trigger('click', { ctrlKey: true })
+    await link.trigger('click', { metaKey: true })
+    await link.trigger('auxclick', { button: 1 })
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('settings-admin-account-activity')
+    expect(wrapper.text()).toContain('Maya')
+
+    await link.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/settings/admin/account-activity/2/insights')
   })
 
   it('renders a localized empty state', async () => {

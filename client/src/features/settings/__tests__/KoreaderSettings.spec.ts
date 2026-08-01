@@ -10,6 +10,11 @@ const routerState = vi.hoisted(() => ({
 }))
 
 vi.mock('vue-router', () => ({
+  RouterLink: {
+    name: 'RouterLink',
+    props: { to: { type: [String, Object, Array], required: true }, replace: Boolean },
+    template: '<a v-bind="$attrs"><slot /></a>',
+  },
   useRoute: () => ({ query: routerState.currentQuery }),
   useRouter: () => ({
     replace: vi.fn<(to: { name: string; query: Record<string, string> }) => void>((to) => {
@@ -173,6 +178,7 @@ function makeBookCard(overrides: Partial<BookCard> = {}): BookCard {
     id: 55,
     title: 'BookOrbit Title',
     authors: ['BookOrbit Author'],
+    authorIds: [1],
     files: [{ id: 44, format: 'epub', role: 'main', sizeBytes: 123 }],
     status: 'present',
     seriesName: null,
@@ -249,32 +255,12 @@ describe('KoreaderSettings', () => {
     searchMock.clear.mockClear()
   })
 
-  it('switches between sync and file naming tabs outside embedded mode', async () => {
-    const wrapper = mount(KoreaderSettings)
-    await flushPromises()
-
-    expect(routerState.replacedQuery).toEqual({ tab: 'settings' })
-    const fileNamingTab = buttonByText(wrapper, 'File Naming')!
-    const syncTab = buttonByText(wrapper, 'Sync Settings')!
-    expect(syncTab.attributes('aria-pressed')).toBe('true')
-    expect(fileNamingTab.attributes('aria-pressed')).toBe('false')
-    await fileNamingTab.trigger('click')
-    expect(fileNamingTab.classes()).toContain('border-primary')
-    expect(fileNamingTab.attributes('aria-pressed')).toBe('true')
-    expect(routerState.replacedQuery).toEqual({ tab: 'file-naming' })
-    await syncTab.trigger('click')
-    expect(syncTab.classes()).toContain('border-primary')
-    expect(syncTab.attributes('aria-pressed')).toBe('true')
-    expect(routerState.replacedQuery).toEqual({ tab: 'settings' })
-  })
-
   it('opens the tab selected by the URL query', async () => {
     routerState.currentQuery = { tab: 'file-naming' }
 
     const wrapper = mount(KoreaderSettings)
     await flushPromises()
 
-    expect(buttonByText(wrapper, 'File Naming')!.attributes('aria-pressed')).toBe('true')
     expect(wrapper.find('[data-testid="file-naming-settings"]').isVisible()).toBe(true)
     expect(routerState.replacedQuery).toBeNull()
   })

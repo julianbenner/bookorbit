@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import type { BookDockFinalizeResult } from '@bookorbit/types'
 import BookDockFinalizeDialog from '../BookDockFinalizeDialog.vue'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { i18n } from '@/i18n'
 import { makeLibrary } from '@/features/library/test/fixtures'
 
@@ -22,11 +23,7 @@ const librariesLoading = ref(false)
 const librariesError = ref<string | null>(null)
 const refreshLibrariesMock = vi.fn<() => void>()
 
-vi.mock('vue-router', () => ({
-  useRouter: () => ({
-    push: vi.fn<(...args: unknown[]) => void>(),
-  }),
-}))
+let router: Router
 
 vi.mock('@/lib/api', () => ({
   api: (...args: unknown[]) => apiMock(...args),
@@ -71,6 +68,7 @@ function mountDialog() {
       selectionCount: 2,
     },
     global: {
+      plugins: [router],
       stubs: {
         Teleport: true,
       },
@@ -81,7 +79,17 @@ function mountDialog() {
 }
 
 describe('BookDockFinalizeDialog', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    const view = { template: '<div />' }
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: view },
+        { path: '/book/:bookId', name: 'book-detail', component: view },
+      ],
+    })
+    await router.push('/')
+    await router.isReady()
     i18n.global.locale.value = 'en'
     libraryOptions.value = [
       makeLibrary({ id: 2, name: 'Main', folders: [{ id: 3, path: '/books', role: 'downloads', createdAt: '2026-01-01T00:00:00.000Z' }] }),
@@ -201,6 +209,21 @@ describe('BookDockFinalizeDialog', () => {
     expect(wrapper.text()).toContain('Import')
     expect(wrapper.text()).not.toContain('Import anyway')
     expect(wrapper.find('input[type="text"]').exists()).toBe(true)
+    const existingLink = wrapper.get('a')
+
+    await existingLink.trigger('click', { button: 1 })
+    await existingLink.trigger('click', { ctrlKey: true })
+    await existingLink.trigger('click', { metaKey: true })
+
+    expect(wrapper.emitted('close')).toBeUndefined()
+    expect(wrapper.emitted('finalized')).toBeUndefined()
+    expect(router.currentRoute.value.fullPath).toBe('/')
+
+    await existingLink.trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/book/42')
+    expect(wrapper.emitted('finalized')).toEqual([[]])
   })
   function startButton(wrapper: ReturnType<typeof mountDialog>) {
     return wrapper.findAll('button').find((button) => button.text().trim() === 'Start')!

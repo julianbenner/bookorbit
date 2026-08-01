@@ -1,11 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { nextTick, ref, type Ref } from 'vue'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import type { GlobalSearchResult } from '@/features/book/composables/useGlobalSearch'
 import AppHeader from '../AppHeader.vue'
 
+enableAutoUnmount(afterEach)
+
 const mocks = vi.hoisted(() => ({
-  routerPush: vi.fn<(to: unknown) => void>(),
   results: null as unknown as Ref<GlobalSearchResult[]>,
   total: null as unknown as Ref<number>,
   loading: null as unknown as Ref<boolean>,
@@ -16,15 +18,6 @@ const mocks = vi.hoisted(() => ({
   loadMore: vi.fn<() => Promise<void>>(),
   clearGlobalSearch: vi.fn<() => void>(),
 }))
-
-vi.mock('vue-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('vue-router')>()
-  return {
-    ...actual,
-    useRouter: () => ({ push: mocks.routerPush }),
-    useRoute: () => ({ name: 'dashboard' }),
-  }
-})
 
 vi.mock('@/features/book/composables/useGlobalSearch', () => ({
   useGlobalSearch: () => ({
@@ -146,6 +139,7 @@ function makeResult(id: number, title = 'Prey'): GlobalSearchResult {
     coverAspectRatio: '2/3',
     title,
     authors: ['Author'],
+    authorIds: [1],
     seriesId: null,
     seriesName: null,
     seriesIndex: null,
@@ -174,19 +168,36 @@ function makeResult(id: number, title = 'Prey'): GlobalSearchResult {
   }
 }
 
+let router: Router
+
 function mountHeader() {
   return mount(AppHeader, {
     global: {
+      plugins: [router],
       stubs: {
-        Transition: false,
+        Transition: true,
       },
     },
   })
 }
 
 describe('AppHeader global search', () => {
-  beforeEach(() => {
-    mocks.routerPush.mockReset()
+  beforeEach(async () => {
+    const view = { template: '<div />' }
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'dashboard', component: view },
+        { path: '/book/:bookId', name: 'book-detail', component: view },
+        { path: '/statistics', name: 'statistics', component: view },
+        { path: '/achievements', name: 'achievements', component: view },
+        { path: '/settings/account', name: 'settings-account', component: view },
+        { path: '/settings/libraries', name: 'settings-libraries', component: view },
+        { path: '/whats-new', name: 'whats-new', component: view },
+      ],
+    })
+    await router.push('/')
+    await router.isReady()
     mocks.loadMore.mockReset()
     mocks.loadMore.mockResolvedValue(undefined)
     mocks.clearGlobalSearch.mockReset()
@@ -203,30 +214,103 @@ describe('AppHeader global search', () => {
     const wrapper = mountHeader()
     const input = wrapper.get('input[placeholder="Search all books..."]')
 
-    await input.trigger('focus')
+    await input.trigger('focusin')
     await input.setValue('  Prey  ')
     await input.trigger('keydown', { key: 'Enter' })
 
-    expect(mocks.routerPush).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.name).toBe('dashboard')
   })
 
   it('keeps Enter-to-open behavior when a result is selected', async () => {
     const wrapper = mountHeader()
     const input = wrapper.get('input[placeholder="Search all books..."]')
 
-    await input.trigger('focus')
+    await input.trigger('focusin')
     await input.setValue('Prey')
     await input.trigger('keydown', { key: 'ArrowDown' })
     await input.trigger('keydown', { key: 'Enter' })
 
-    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 101 } })
+    await flushPromises()
+    expect(router.currentRoute.value.fullPath).toBe('/book/101')
+  })
+
+  it.each([{ button: 1 }, { ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }])(
+    'keeps the search query and source page for a modified result click %j',
+    async (modifiers) => {
+      const wrapper = mountHeader()
+      const input = wrapper.get('input[placeholder="Search all books..."]')
+      await input.trigger('focusin')
+      await input.setValue('Prey')
+      const result = wrapper.get('[data-testid="global-search-dropdown"] a')
+
+      await result.trigger('click', modifiers)
+      await flushPromises()
+
+      expect((input.element as HTMLInputElement).value).toBe('Prey')
+      expect(wrapper.find('[data-testid="global-search-dropdown"]').exists()).toBe(true)
+      expect(router.currentRoute.value.name).toBe('dashboard')
+    },
+  )
+
+  it('keeps results available while focus moves through the search controls and links', async () => {
+    const wrapper = mountHeader()
+    const input = wrapper.get('input[placeholder="Search all books..."]')
+    await input.trigger('focusin')
+    await input.setValue('Prey')
+    const container = wrapper.get('[data-tour="global-search"]')
+    const clear = container.get('button')
+
+    await input.trigger('focusout', { relatedTarget: clear.element })
+    expect(wrapper.find('[data-testid="global-search-dropdown"]').exists()).toBe(true)
+    const result = container.get('a')
+    await clear.trigger('focusout', { relatedTarget: result.element })
+    expect(wrapper.find('[data-testid="global-search-dropdown"]').exists()).toBe(true)
+
+    await result.trigger('focusout', { relatedTarget: wrapper.get('[data-tour="statistics-btn"]').element })
+    expect(wrapper.find('[data-testid="global-search-dropdown"]').exists()).toBe(false)
+  })
+
+  it('retains the result through middle mousedown and loss of document focus', async () => {
+    const wrapper = mountHeader()
+    const input = wrapper.get('input[placeholder="Search all books..."]')
+    await input.trigger('focusin')
+    await input.setValue('Prey')
+    const result = wrapper.get('[data-testid="global-search-dropdown"] a')
+    const middleDown = new MouseEvent('mousedown', { button: 1, bubbles: true, cancelable: true })
+
+    result.element.dispatchEvent(middleDown)
+    await input.trigger('focusout', { relatedTarget: null })
+    await result.trigger('auxclick', { button: 1 })
+
+    expect(middleDown.defaultPrevented).toBe(false)
+    expect(wrapper.get('[data-testid="global-search-dropdown"] a').attributes('href')).toBe('/book/101')
+    expect((input.element as HTMLInputElement).value).toBe('Prey')
+    expect(router.currentRoute.value.name).toBe('dashboard')
+
+    document.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    await nextTick()
+    expect(wrapper.find('[data-testid="global-search-dropdown"]').exists()).toBe(false)
+  })
+
+  it('opens a result and clears the search for a plain primary click', async () => {
+    const wrapper = mountHeader()
+    const input = wrapper.get('input[placeholder="Search all books..."]')
+    await input.trigger('focusin')
+    await input.setValue('Prey')
+
+    await wrapper.get('[data-testid="global-search-dropdown"] a').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.fullPath).toBe('/book/101')
+    expect((input.element as HTMLInputElement).value).toBe('')
+    expect(wrapper.find('[data-testid="global-search-dropdown"]').exists()).toBe(false)
   })
 
   it('loads more results from the dropdown footer', async () => {
     const wrapper = mountHeader()
     const input = wrapper.get('input[placeholder="Search all books..."]')
 
-    await input.trigger('focus')
+    await input.trigger('focusin')
     await input.setValue('Prey')
 
     const loadMore = wrapper.findAll('button').find((button) => button.text() === 'Load more (2/42)')
@@ -241,7 +325,7 @@ describe('AppHeader global search', () => {
     const wrapper = mountHeader()
     const input = wrapper.get('input[placeholder="Search all books..."]')
 
-    await input.trigger('focus')
+    await input.trigger('focusin')
     await input.setValue('Prey')
 
     const dropdown = wrapper.get('[data-testid="global-search-dropdown"]')
@@ -261,10 +345,10 @@ describe('AppHeader global search', () => {
     const wrapper = mountHeader()
     const input = wrapper.get('input[placeholder="Search all books..."]')
 
-    await input.trigger('focus')
+    await input.trigger('focusin')
     await input.setValue('Prey')
 
-    const renderedResults = wrapper.findAll('button').filter((button) => button.text().startsWith('Prey '))
+    const renderedResults = wrapper.findAll('[data-testid="global-search-dropdown"] a')
     expect(renderedResults.length).toBeGreaterThan(0)
     expect(renderedResults.length).toBeLessThan(60)
     expect(wrapper.text()).toContain('Prey 1')
@@ -303,18 +387,6 @@ describe('AppHeader global search', () => {
     expect(wrapper.text()).not.toContain('Achievements')
   })
 
-  it('navigates to statistics from the mobile overflow menu', async () => {
-    const wrapper = mountHeader()
-    const statisticsItem = wrapper.findAllComponents({ name: 'DropdownMenuItem' }).find((item) => item.text().trim() === 'Statistics')
-
-    expect(statisticsItem).toBeDefined()
-    if (!statisticsItem) throw new Error('Expected statistics overflow menu item')
-
-    await statisticsItem.trigger('click')
-
-    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'statistics', query: { tab: 'library' } })
-  })
-
   it('places the desktop language control immediately before settings', () => {
     const wrapper = mountHeader()
     const buttons = wrapper.findAll('button')
@@ -341,17 +413,5 @@ describe('AppHeader global search', () => {
     expect(wrapper.get('[data-tour="documentation-link"]').attributes('aria-label')).toBe('Help')
     expect(wrapper.get('[data-tour="appearance-picker"]').attributes('aria-label')).toBe('Appearance')
     expect(wrapper.get('[data-tour="settings-nav"]').attributes('aria-label')).toBe('Settings')
-  })
-
-  it('opens settings from the mobile overflow menu', async () => {
-    const wrapper = mountHeader()
-    const settingsItem = wrapper.findAllComponents({ name: 'DropdownMenuItem' }).find((item) => item.text().trim() === 'Settings')
-
-    expect(settingsItem).toBeDefined()
-    if (!settingsItem) throw new Error('Expected settings overflow menu item')
-
-    await settingsItem.trigger('click')
-
-    expect(mocks.routerPush).toHaveBeenCalledWith({ name: 'settings-libraries' })
   })
 })

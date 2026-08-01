@@ -1,6 +1,7 @@
 <script setup lang="ts" generic="T extends string">
 import { nextTick, ref, watch } from 'vue'
 import { useScrollOverflow } from '@/composables/useScrollOverflow'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 
 interface SettingsTabItem {
   id: T
@@ -12,6 +13,7 @@ const props = withDefaults(
   defineProps<{
     tabs: readonly SettingsTabItem[]
     activeTab: T
+    tabTo: (tab: T) => RouteLocationRaw
     variant?: 'page' | 'section'
     testIdPrefix?: string
     idPrefix?: string
@@ -19,16 +21,12 @@ const props = withDefaults(
   { variant: 'page' },
 )
 
-const emit = defineEmits<{
-  select: [tab: T]
-}>()
-
 const container = ref<HTMLElement | null>(null)
 const { hasStartOverflow, hasEndOverflow } = useScrollOverflow(container)
 
 async function revealActiveTab(): Promise<void> {
   await nextTick()
-  const tab = container.value?.querySelector<HTMLElement>('[aria-current="page"], [aria-selected="true"]')
+  const tab = container.value?.querySelector<HTMLElement>('[aria-current="page"]')
   if (!tab || !container.value || container.value.scrollWidth <= container.value.clientWidth) return
 
   const containerRect = container.value.getBoundingClientRect()
@@ -39,10 +37,6 @@ async function revealActiveTab(): Promise<void> {
 }
 
 watch(() => props.activeTab, revealActiveTab, { immediate: true })
-
-function handleSelect(tab: T): void {
-  emit('select', tab)
-}
 </script>
 
 <template>
@@ -50,24 +44,22 @@ function handleSelect(tab: T): void {
        tabs sit past the edge. Only that variant needs the positioned wrapper, so the page variant
        keeps its exact layout box and its sticky positioning. -->
   <div :class="variant === 'section' ? 'relative shrink-0' : 'contents'">
-    <div
+    <nav
       ref="container"
-      :role="variant === 'page' ? 'tablist' : undefined"
       :class="
         variant === 'section'
           ? 'flex h-11 shrink-0 snap-x snap-mandatory items-stretch overflow-x-auto border-b px-4 scrollbar-none md:snap-none'
           : 'sticky top-0 z-20 mb-5 flex snap-x gap-1 overflow-x-auto border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:static md:mb-6 md:overflow-visible'
       "
     >
-      <button
+      <RouterLink
         v-for="tab in tabs"
         :key="tab.id"
-        :role="variant === 'page' ? 'tab' : undefined"
+        :to="tabTo(tab.id)"
+        replace
         :id="idPrefix ? `${idPrefix}-${tab.id}-tab` : undefined"
-        :aria-selected="variant === 'page' ? activeTab === tab.id : undefined"
-        :aria-pressed="variant === 'page' ? activeTab === tab.id : undefined"
-        :aria-current="variant === 'section' && activeTab === tab.id ? 'page' : undefined"
-        :aria-controls="variant === 'page' ? tab.controls : undefined"
+        :aria-current="activeTab === tab.id ? 'page' : undefined"
+        :aria-controls="tab.controls"
         :data-testid="testIdPrefix ? `${testIdPrefix}-${tab.id}` : undefined"
         :class="[
           variant === 'section'
@@ -77,11 +69,10 @@ function handleSelect(tab: T): void {
             ? 'border-primary text-foreground'
             : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
         ]"
-        @click="handleSelect(tab.id)"
       >
         {{ tab.label }}
-      </button>
-    </div>
+      </RouterLink>
+    </nav>
     <div
       v-if="variant === 'section' && hasStartOverflow"
       class="pointer-events-none absolute inset-y-px start-0 w-8 bg-linear-to-r from-background to-transparent"

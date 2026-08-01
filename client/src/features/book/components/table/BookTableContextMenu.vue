@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { BookOpen, ExternalLink, FolderInput, FolderPlus, Pencil, RefreshCw, Send, Trash2 } from '@lucide/vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useRefreshMetadata } from '@/features/book/composables/useRefreshMetadata'
@@ -10,6 +10,7 @@ import { useRefreshingBooks } from '@/features/book/composables/useRefreshingBoo
 import { detectChangedColumns, mergeBookCardWithDetail } from '@/features/book/lib/book-card-mapper'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import type { BookCard } from '@bookorbit/types'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 
 type BookActionType = 'quick-view' | 'add-to-collection' | 'move-to-library' | 'delete'
 
@@ -24,7 +25,6 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const router = useRouter()
 const { t } = useI18n()
 const { hasPermission } = usePermissions()
 const { refreshWithFeedback, refreshing } = useRefreshMetadata()
@@ -51,6 +51,10 @@ const adjustedY = computed(() => {
 
 function closeMenu(): void {
   emit('close')
+}
+
+function handleNavigate(event: MouseEvent): void {
+  if (isPlainPrimaryClick(event)) closeMenu()
 }
 
 async function measureMenu(): Promise<void> {
@@ -83,18 +87,6 @@ function handleScroll(): void {
 function emitAction(type: BookActionType): void {
   if (!props.book) return
   emit('action', props.book, type)
-  closeMenu()
-}
-
-function openBookDetails(): void {
-  if (!props.book) return
-  router.push({ name: 'book-detail', params: { bookId: props.book.id } })
-  closeMenu()
-}
-
-function openEditMetadata(): void {
-  if (!props.book) return
-  router.push({ name: 'book-detail', params: { bookId: props.book.id }, query: { tab: 'edit' } })
   closeMenu()
 }
 
@@ -154,18 +146,23 @@ onBeforeUnmount(() => {
         <BookOpen :size="14" />
         {{ t('book.table.actions.quickView') }}
       </button>
-      <button class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent" @click="openBookDetails">
+      <RouterLink
+        :to="{ name: 'book-detail', params: { bookId: book.id } }"
+        class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
+        @click="handleNavigate"
+      >
         <ExternalLink :size="14" />
         {{ t('book.table.actions.bookDetails') }}
-      </button>
-      <button
+      </RouterLink>
+      <RouterLink
         v-if="hasPermission('library_edit_metadata')"
+        :to="{ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } }"
         class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
-        @click="openEditMetadata"
+        @click="handleNavigate"
       >
         <Pencil :size="14" />
         {{ t('book.table.actions.editMetadata') }}
-      </button>
+      </RouterLink>
       <button
         v-if="hasPermission('library_edit_metadata')"
         class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"

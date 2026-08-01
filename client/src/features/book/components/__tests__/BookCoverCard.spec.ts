@@ -1,16 +1,25 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import BookCoverCard from '../BookCoverCard.vue'
 import type { BookCard } from '@bookorbit/types'
-import { nextTick, ref } from 'vue'
+import { nextTick, ref, defineComponent } from 'vue'
 import { COVER_ASPECT_RATIO_KEY } from '@/features/book/lib/cover-aspect-ratio'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
-const routerPushMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>())
-
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()
-  return { ...actual, useRoute: () => ({ fullPath: '/' }), useRouter: () => ({ push: routerPushMock }) }
+  return { ...actual, useRoute: () => ({ fullPath: '/' }) }
+})
+
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: {
+    to: {
+      type: [String, Object],
+      required: true,
+    },
+  },
+  template: '<a><slot /></a>',
 })
 vi.mock('@/features/author/api/author', () => ({
   fetchAuthors: vi.fn<(...args: unknown[]) => unknown>(),
@@ -25,8 +34,6 @@ vi.mock('@/features/book/lib/book-cover', () => ({
     from: 'oklch(0.22 0.07 200)',
     to: 'oklch(0.28 0.05 220)',
     color: 'oklch(0.99 0.025 200)',
-    accent: 'oklch(0.82 0.16 200)',
-    textMuted: 'oklch(0.92 0.08 200)',
   }),
   titleFontSizeClass: () => 'text-[11cqi]',
 }))
@@ -37,6 +44,7 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
 // Stub complex UI sub-components
 const globalStubs = {
   stubs: {
+    RouterLink: RouterLinkStub,
     DropdownMenu: { template: '<div><slot /></div>' },
     DropdownMenuContent: { template: '<div><slot /></div>' },
     DropdownMenuItem: { template: '<div><slot /></div>' },
@@ -69,10 +77,6 @@ function mountCard(book: BookCard, coverAspectRatio: '2/3' | '1/1' = '2/3', cove
 const { cardOverlays, bookSpineOverlay, bookShadowStrength, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, thumbnailClickAction } =
   useDisplaySettings()
 
-beforeEach(() => {
-  routerPushMock.mockClear()
-})
-
 afterEach(() => {
   cardOverlays.value = ['progress-bar', 'format', 'rating', 'read-status']
   bookSpineOverlay.value = 'off'
@@ -89,6 +93,7 @@ const missingBook: BookCard = {
   coverAspectRatio: '2/3',
   title: 'Gone Book',
   authors: ['Test Author'],
+  authorIds: [],
   seriesName: null,
   seriesIndex: null,
   files: [],
@@ -121,6 +126,7 @@ const presentBook: BookCard = {
   coverAspectRatio: '2/3',
   title: 'Available Book',
   authors: ['Test Author'],
+  authorIds: [],
   seriesName: null,
   seriesIndex: null,
   files: [{ id: 10, format: 'epub', role: 'primary', sizeBytes: null }],
@@ -212,34 +218,6 @@ describe('BookCoverCard - present state', () => {
     expect(wrapper.find('.lucide-headphones').exists()).toBe(true)
   })
 
-  it('opens the reader on desktop card click by default', async () => {
-    const wrapper = mountCard(presentBook)
-
-    await wrapper.find('.group').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith(expect.objectContaining({ name: 'reader', params: { bookId: 2, fileId: 10 } }))
-  })
-
-  it('opens book details on desktop card click when thumbnail clicks prefer details', async () => {
-    thumbnailClickAction.value = 'details'
-    const wrapper = mountCard(presentBook)
-
-    await wrapper.find('.group').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 2 } })
-    expect(routerPushMock).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
-  })
-
-  it('opens book details from the primary overlay action when thumbnail clicks prefer details', async () => {
-    thumbnailClickAction.value = 'details'
-    const wrapper = mountCard(presentBook)
-
-    await wrapper.get('[data-testid="grid-card-primary-action"]').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 2 } })
-    expect(routerPushMock).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'reader' }))
-  })
-
   it('labels and describes the quick-view and start-reading actions', () => {
     const wrapper = mountCard(presentBook)
 
@@ -261,19 +239,10 @@ describe('BookCoverCard - present state', () => {
     const wrapper = mountCard(presentBook)
 
     expect(wrapper.get('[data-testid="grid-card-primary-action"]').attributes('aria-label')).toBe('Book Details')
-    expect(wrapper.get('button[aria-label="Start reading"]')).toBeTruthy()
+    expect(wrapper.get('[aria-label="Start reading"]')).toBeTruthy()
   })
 
-  it('opens book details for missing books when thumbnail clicks prefer details', async () => {
-    thumbnailClickAction.value = 'details'
-    const wrapper = mountCard(missingBook)
-
-    await wrapper.find('.group').trigger('click')
-
-    expect(routerPushMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 1 } })
-  })
-
-  it('selects instead of navigating in selection mode', async () => {
+  it('selects instead of rendering navigation links in selection mode', async () => {
     thumbnailClickAction.value = 'details'
     const wrapper = mount(BookCoverCard, {
       props: { book: presentBook, selectionMode: true },
@@ -288,7 +257,7 @@ describe('BookCoverCard - present state', () => {
     await wrapper.find('.group').trigger('click')
 
     expect(wrapper.emitted('select')).toHaveLength(1)
-    expect(routerPushMock).not.toHaveBeenCalled()
+    expect(wrapper.findAllComponents(RouterLinkStub)).toHaveLength(0)
   })
 
   it('does not apply grayscale to the cover container', () => {

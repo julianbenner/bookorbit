@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createI18n } from 'vue-i18n'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
@@ -62,14 +62,49 @@ describe('NotificationItem', () => {
    * The stored URL verbatim, query and all. The tab used to be re-derived here from the type,
    * which was a second copy of a decision the server had already made and sent.
    */
-  it('follows the action URL the server stored, including its query', async () => {
-    const { router, wrapper } = await mountItem(notification({ actionUrl: '/requests?tab=all' }))
-    const push = vi.spyOn(router, 'push')
+  it('links an internal action URL, including its query', async () => {
+    const { wrapper } = await mountItem(notification({ actionUrl: '/requests?tab=all' }))
 
-    await wrapper.findAll('button')[0].trigger('click')
-
-    expect(push).toHaveBeenCalledExactlyOnceWith('/requests?tab=all')
+    expect(wrapper.get('a').attributes('href')).toBe('/requests?tab=all')
   })
+
+  it.each(['https://example.com/report', '//example.com/report'])('opens an external action URL %s in a new tab', async (actionUrl) => {
+    const { wrapper } = await mountItem(notification({ actionUrl }))
+    const anchor = wrapper.get('a')
+
+    expect(anchor.attributes('href')).toBe(actionUrl)
+    expect(anchor.attributes('target')).toBe('_blank')
+    expect(anchor.attributes('rel')).toBe('noopener noreferrer')
+  })
+
+  it('marks an unread notification as read when its action is opened', async () => {
+    const { wrapper } = await mountItem(notification())
+
+    await wrapper.get('a').trigger('click')
+
+    expect(wrapper.emitted('read')).toEqual([[1]])
+  })
+
+  it('does not re-emit read for a notification that is already read', async () => {
+    const { wrapper } = await mountItem(notification({ read: true }))
+
+    await wrapper.get('a').trigger('click')
+
+    expect(wrapper.emitted('read')).toBeUndefined()
+  })
+
+  it.each([{ button: 1 }, { ctrlKey: true }, { metaKey: true }, { shiftKey: true }, { altKey: true }])(
+    'leaves an unread notification and the source page unchanged for a modified click %j',
+    async (modifiers) => {
+      const { router, wrapper } = await mountItem(notification())
+
+      await wrapper.get('a').trigger('click', modifiers)
+
+      expect(wrapper.emitted('read')).toBeUndefined()
+      expect(router.currentRoute.value.fullPath).toBe('/')
+      expect(wrapper.find('a').exists()).toBe(true)
+    },
+  )
 
   it.each([
     [NotificationType.BookRequestSubmitted, 'text-success'],
@@ -82,11 +117,27 @@ describe('NotificationItem', () => {
     expect(wrapper.find('.lucide-book-plus').classes()).toContain(severityClass)
   })
 
-  it('exposes separate native controls for opening and dismissing the notification', async () => {
+  it('exposes separate controls for opening and dismissing the notification', async () => {
     const { wrapper } = await mountItem(notification())
+    const dismiss = wrapper.get('button[aria-label="Dismiss notification"]')
 
-    expect(wrapper.findAll('button')).toHaveLength(2)
-    expect(wrapper.find('button[aria-label="Dismiss notification"]').exists()).toBe(true)
-    expect(wrapper.findAll('button')[0].element.tagName).toBe('BUTTON')
+    expect(wrapper.findAll('button')).toHaveLength(1)
+    expect(wrapper.get('a').element.contains(dismiss.element)).toBe(false)
+
+    await dismiss.trigger('click')
+
+    expect(wrapper.emitted('dismiss')).toEqual([[1]])
+    expect(wrapper.emitted('read')).toBeUndefined()
+  })
+
+  /** Without a URL there is nothing to link to, so the row stays a button. */
+  it('renders a button when the notification has no action URL', async () => {
+    const { wrapper } = await mountItem(notification({ actionUrl: null }))
+
+    expect(wrapper.findAll('a')).toHaveLength(0)
+    expect(wrapper.findAll('button')[0].text()).toContain('New book request')
+
+    await wrapper.findAll('button')[0]!.trigger('click', { ctrlKey: true })
+    expect(wrapper.emitted('read')).toEqual([[1]])
   })
 })

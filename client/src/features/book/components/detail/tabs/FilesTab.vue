@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, toRef, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, type RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useElementSize } from '@vueuse/core'
 import { FilePlus, Files, X } from '@lucide/vue'
@@ -116,12 +116,12 @@ function closeSheet() {
   sheetOpener = null
 }
 
-function openFile(file: TreeFile, mode?: 'peek') {
-  router.push({
+function readerRoute(file: TreeFile, mode?: 'peek'): RouteLocationRaw {
+  return {
     name: 'reader',
     params: { bookId: props.book.id, fileId: file.id },
     query: mode === 'peek' ? { format: file.format ?? 'epub', mode } : { format: file.format ?? 'epub' },
-  })
+  }
 }
 
 function downloadFile(file: TreeFile) {
@@ -266,8 +266,8 @@ async function confirmDelete() {
         :can-download="canDownload"
         :can-edit="canEdit"
         :can-delete="canDelete"
+        :reader-route="readerRoute"
         @select="handleSelect"
-        @open="openFile"
         @download="downloadFile"
         @rename="openRenameModal"
         @remove="openDeleteModal"
@@ -309,7 +309,7 @@ async function confirmDelete() {
             :can-download="canDownload"
             :can-edit="canEdit"
             :can-delete="canDelete"
-            @open="openFile"
+            :reader-route="readerRoute"
             @download="downloadFile"
             @rename="openRenameModal"
             @remove="openDeleteModal"

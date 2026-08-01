@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { Check, ExternalLink, Loader2, MoreHorizontal, RefreshCw, Trash2 } from '@lucide/vue'
 import type { AuthorCoverShape, AuthorSummary } from '@bookorbit/types'
 import { formatNumber, formatRelativeFromNow } from '@/i18n/formatters'
@@ -10,6 +11,7 @@ import AuthorPortrait from './AuthorPortrait.vue'
 const props = withDefaults(
   defineProps<{
     author: AuthorSummary
+    to: RouteLocationRaw
     shape?: AuthorCoverShape
     selectionMode?: boolean
     selected?: boolean
@@ -23,7 +25,6 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  open: [authorId: number]
   select: [event: MouseEvent]
   refresh: [authorId: number]
   delete: [authorId: number]
@@ -56,11 +57,7 @@ const busyLabel = computed(() =>
 )
 
 function handleActivate(event: MouseEvent) {
-  if (props.selectionMode || event.metaKey || event.ctrlKey || event.shiftKey) {
-    emit('select', event)
-    return
-  }
-  emit('open', props.author.id)
+  emit('select', event)
 }
 
 function handleRefresh() {
@@ -79,11 +76,18 @@ function handleDelete() {
     <!-- The hit target is the whole tile, name included. Sizing it to the artwork
          instead leaves every corner of a circular tile dead, and never lets anyone
          click the name: 26 of 63 sampled points across a tile did nothing. -->
+    <RouterLink
+      v-if="!selectionMode"
+      :to="to"
+      class="absolute inset-0 z-10 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      :aria-label="accessibleLabel"
+    />
     <button
+      v-else
       type="button"
       class="absolute inset-0 z-10 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       :aria-label="accessibleLabel"
-      :aria-pressed="selectionMode ? selected : undefined"
+      :aria-pressed="selected"
       @click="handleActivate"
     />
     <!-- Two boxes, deliberately: the outer one is the badge positioning context and
@@ -165,9 +169,11 @@ function handleDelete() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem @click="emit('open', author.id)">
-            <ExternalLink class="mr-2 h-4 w-4" />
-            {{ t('author.card.viewDetails') }}
+          <DropdownMenuItem as-child>
+            <RouterLink :to="to">
+              <ExternalLink class="mr-2 h-4 w-4" />
+              {{ t('author.card.viewDetails') }}
+            </RouterLink>
           </DropdownMenuItem>
           <DropdownMenuItem :disabled="!canRefresh || refreshing" @click="handleRefresh">
             <Loader2 v-if="refreshing" class="mr-2 h-4 w-4 animate-spin" />

@@ -30,6 +30,7 @@ export function mergeBookCardWithDetail(book: BookCard, detail: BookDetail): Boo
     seriesMemberships: detail.seriesMemberships,
     rating: detail.rating,
     authors: detail.authors.map((author) => author.name),
+    authorIds: detail.authors.map((author) => author.id),
     genres: detail.genres,
     files: detail.files.map(toBookFileRef),
     readStatus: detail.readStatus,

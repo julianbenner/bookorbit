@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
+import { defineComponent } from 'vue'
 import type { BookCard } from '@bookorbit/types'
 import BookTableCollapsedSeriesCell from '../BookTableCollapsedSeriesCell.vue'
 
@@ -19,7 +20,9 @@ function makeBook(format: string | null): BookCard {
     coverAspectRatio: '2/3',
     title: 'Saga',
     authors: [],
+    authorIds: [],
     seriesName: 'Saga',
+    seriesId: 42,
     seriesIndex: null,
     files: format ? [{ id: 1, format, role: 'primary', sizeBytes: null }] : [],
     publishedDate: null,
@@ -58,6 +61,11 @@ const CoverSurfaceStub = {
   props: ['isComic', 'disableSpine'],
   template: '<div data-testid="surface" :data-comic="isComic"><slot /></div>',
 }
+const RouterLinkStub = defineComponent({
+  name: 'RouterLink',
+  props: { to: { type: [String, Object], required: true } },
+  template: '<a><slot /></a>',
+})
 
 function mountCell(format: string | null, colId = 'cover') {
   return mount(BookTableCollapsedSeriesCell, {
@@ -65,6 +73,7 @@ function mountCell(format: string | null, colId = 'cover') {
     global: {
       stubs: {
         BookCoverSurface: CoverSurfaceStub,
+        RouterLink: RouterLinkStub,
         Tooltip: { template: '<div><slot /></div>' },
         TooltipTrigger: { template: '<div><slot /></div>' },
         TooltipContent: { template: '<div data-testid="tooltip-content"><slot /></div>' },
@@ -106,13 +115,12 @@ describe('BookTableCollapsedSeriesCell comic flag', () => {
     expect(wrapper.get('[data-testid="tooltip-content"]').text()).toBe('Series row')
   })
 
-  it('offers a labeled button to open the series', async () => {
+  it('offers a labeled link to the series', () => {
     const wrapper = mountCell('epub', 'actions')
-    const button = wrapper.get('button')
+    const link = wrapper.getComponent(RouterLinkStub)
 
-    expect(button.attributes('aria-label')).toBe('Open series')
+    expect(link.attributes('aria-label')).toBe('Open series')
     expect(wrapper.get('[data-testid="tooltip-content"]').text()).toBe('Open series')
-    await button.trigger('click')
-    expect(wrapper.emitted('open-series')).toEqual([[]])
+    expect(link.props('to')).toEqual({ name: 'series-detail', params: { seriesId: 42 } })
   })
 })

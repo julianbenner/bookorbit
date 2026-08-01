@@ -55,7 +55,6 @@ function makeSeries(overrides: Partial<SeriesSummary> = {}): SeriesSummary {
 
 const mocks = vi.hoisted(() => ({
   route: { params: {} as Record<string, string>, query: {} as Record<string, unknown>, fullPath: '/series' },
-  routerPush: vi.fn<(to: unknown) => Promise<void>>(),
   routerReplace: vi.fn<(to: unknown) => Promise<void>>(),
   fetchLibraries: vi.fn<() => Promise<void>>(),
   load: vi.fn<(reset?: boolean) => Promise<void>>(),
@@ -73,7 +72,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('vue-router', () => ({
   useRoute: () => mocks.route,
-  useRouter: () => ({ push: mocks.routerPush, replace: mocks.routerReplace }),
+  useRouter: () => ({ replace: mocks.routerReplace }),
+  RouterLink: {
+    name: 'RouterLink',
+    props: { to: { type: [String, Object], required: true } },
+    template: '<a><slot /></a>',
+  },
 }))
 
 vi.mock('@/features/library/composables/useLibraries', () => ({
@@ -139,7 +143,6 @@ describe('SeriesView', () => {
     vi.stubGlobal('ResizeObserver', MockResizeObserver)
     mocks.route.query = {}
     mocks.storageValues = {}
-    mocks.routerPush.mockResolvedValue()
     mocks.routerReplace.mockResolvedValue()
     mocks.fetchLibraries.mockResolvedValue()
     mocks.load.mockResolvedValue()

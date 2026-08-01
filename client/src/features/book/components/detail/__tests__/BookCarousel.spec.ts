@@ -1,13 +1,9 @@
-import { mount } from '@vue/test-utils'
+import { mount, RouterLinkStub } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 
 import BookCarousel, { type CarouselBook } from '../BookCarousel.vue'
 import type { ReadStatus } from '@bookorbit/types'
 
-vi.mock('vue-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('vue-router')>()
-  return { ...actual, useRouter: () => ({ push: vi.fn<(...args: unknown[]) => unknown>() }) }
-})
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
   useCoverVersions: () => ({ coverUrl: () => '/cover.jpg' }),
 }))
@@ -25,7 +21,10 @@ function makeBook(id: number, status: ReadStatus | null): CarouselBook {
 }
 
 function mountCarousel(books: CarouselBook[]) {
-  return mount(BookCarousel, { props: { books, loading: false, showHeader: false } })
+  return mount(BookCarousel, {
+    props: { books, loading: false, showHeader: false },
+    global: { stubs: { RouterLink: RouterLinkStub } },
+  })
 }
 
 describe('BookCarousel read status badge', () => {

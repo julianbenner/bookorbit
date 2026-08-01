@@ -672,11 +672,11 @@ export class ScannerRepository {
         .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
         .where(inArray(books.id, bookIds)),
       this.db
-        .select({ bookId: bookAuthors.bookId, name: authors.name })
+        .select({ bookId: bookAuthors.bookId, authorId: authors.id, name: authors.name })
         .from(bookAuthors)
         .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
         .where(inArray(bookAuthors.bookId, bookIds))
-        .orderBy(bookAuthors.displayOrder),
+        .orderBy(asc(bookAuthors.bookId), asc(bookAuthors.displayOrder), asc(bookAuthors.authorId)),
       this.db
         .select({
           bookId: bookFiles.bookId,

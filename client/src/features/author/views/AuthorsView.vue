@@ -225,8 +225,8 @@ function syncRouteQuery() {
   })
 }
 
-function openAuthor(authorId: number) {
-  void router.push({ name: 'author-detail', params: { id: authorId }, query: { from: route.fullPath } })
+function authorDetailTo(authorId: number) {
+  return { name: 'author-detail', params: { id: authorId }, query: { from: route.fullPath } }
 }
 
 function setSortField(field: AuthorListSort) {
@@ -673,7 +673,7 @@ defineOptions({ name: 'AuthorsView' })
                 :can-delete="canDeleteAuthors"
                 :refreshing="isRefreshing(author.id)"
                 :deleting="deletingAuthorId === author.id"
-                @open="openAuthor"
+                :to="authorDetailTo(author.id)"
                 @select="handleAuthorSelect(author.id, $event)"
                 @refresh="refreshSingleAuthorMetadata"
                 @delete="promptDeleteSingleAuthor"
@@ -697,7 +697,7 @@ defineOptions({ name: 'AuthorsView' })
                 :can-delete="canDeleteAuthors"
                 :refreshing="isRefreshing(author.id)"
                 :deleting="deletingAuthorId === author.id"
-                @open="openAuthor"
+                :to="authorDetailTo(author.id)"
                 @select="handleAuthorSelect(author.id, $event)"
                 @refresh="refreshSingleAuthorMetadata"
                 @delete="promptDeleteSingleAuthor"

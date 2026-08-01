@@ -41,6 +41,7 @@ import { useWhatsNew } from '@/features/whats-new/composables/useWhatsNew'
 import { useBookRequestSummary } from '@/features/book-requests/composables/useBookRequestSummary'
 import { useBookRequestProgress } from '@/features/book-requests/composables/useBookRequestProgress'
 import { useBookRequestVisibility } from '@/features/book-requests/composables/useBookRequestVisibility'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -159,7 +160,8 @@ async function persistPodcastLibraryOrder(order: DisplayOrderEntry[]) {
   await reorderLibraries(mergedMediaOrder(bookLibraries.value, order))
 }
 
-function handleNavigate() {
+function handleNavigate(event?: MouseEvent) {
+  if (event && !isPlainPrimaryClick(event)) return
   if (isMobile.value) setOpenMobile(false)
 }
 

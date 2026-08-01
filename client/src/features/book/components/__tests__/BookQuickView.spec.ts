@@ -1,6 +1,7 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import type { BookDetail } from '@bookorbit/types'
 import BookQuickView from '../BookQuickView.vue'
 
@@ -14,20 +15,10 @@ const permissionState = {
 }
 
 const fetchMock = vi.fn<(bookId: number) => void>()
-const pushMock = vi.fn<(...args: unknown[]) => unknown>()
 
 const detailRef = ref<BookDetail | null>(null)
 const loadingRef = ref(false)
-
-vi.mock('vue-router', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('vue-router')>()
-  return {
-    ...actual,
-    useRouter: () => ({
-      push: pushMock,
-    }),
-  }
-})
+let router: Router
 
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({
@@ -132,6 +123,9 @@ function makeDetail(overrides: Partial<BookDetail> = {}): BookDetail {
 }
 
 const globalStubs = {
+  get plugins() {
+    return [router]
+  },
   stubs: {
     Sheet: { template: '<div><slot /></div>' },
     SheetContent: { template: '<div><slot /></div>' },
@@ -154,14 +148,22 @@ const globalStubs = {
 }
 
 describe('BookQuickView', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     permissionState.canDelete = true
     permissionState.canEditMetadata = true
     fetchMock.mockReset()
-    pushMock.mockReset()
     loadingRef.value = false
     displaySettings.bookCoverDisplayMode.value = 'blurred-fit'
     detailRef.value = makeDetail()
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', component: { template: '<div />' } },
+        { path: '/book/:bookId', name: 'book-detail', component: { template: '<div />' } },
+        { path: '/read/:bookId/:fileId', name: 'reader', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/')
   })
 
   it('fetches detail when mounted with a book id', () => {
@@ -204,6 +206,55 @@ describe('BookQuickView', () => {
 
     expect(wrapper.emitted('update:open')).toEqual([[false]])
     expect(wrapper.emitted('action')).toEqual([['delete']])
+  })
+  it.each(['/read/42/11?format=EPUB', '/book/42', '/book/42?tab=edit', '/read/42/11?format=EPUB&mode=peek'])(
+    'navigates and dismisses quick view on plain activation of %s',
+    async (href) => {
+      const wrapper = mount(BookQuickView, {
+        props: { open: true, bookId: 42 },
+        global: globalStubs,
+      })
+      const link = wrapper.get(`a[href="${href}"]`)
+
+      await link.trigger('click')
+      await flushPromises()
+
+      expect(router.currentRoute.value.fullPath).toBe(href)
+      expect(wrapper.emitted('update:open')).toEqual([[false]])
+      expect(link.element.querySelector('a, button')).toBeNull()
+    },
+  )
+
+  it.each([{ button: 1 }, { button: 0, ctrlKey: true }, { button: 0, metaKey: true }, { button: 0, shiftKey: true }, { button: 0, altKey: true }])(
+    'keeps quick view open and allows the browser to follow modified links (%o)',
+    async (options) => {
+      const wrapper = mount(BookQuickView, {
+        props: { open: true, bookId: 42 },
+        global: globalStubs,
+      })
+
+      for (const href of ['/read/42/11?format=EPUB', '/book/42', '/book/42?tab=edit', '/read/42/11?format=EPUB&mode=peek']) {
+        const event = new MouseEvent('click', { ...options, bubbles: true, cancelable: true })
+        wrapper.get(`a[href="${href}"]`).element.dispatchEvent(event)
+        await flushPromises()
+
+        expect(event.defaultPrevented).toBe(false)
+        expect(router.currentRoute.value.fullPath).toBe('/')
+        expect(wrapper.emitted('update:open')).toBeUndefined()
+      }
+    },
+  )
+
+  it('disables reader and peek when there is no openable file', () => {
+    detailRef.value = makeDetail({ files: [] })
+    const wrapper = mount(BookQuickView, {
+      props: { open: true, bookId: 42 },
+      global: globalStubs,
+    })
+
+    expect(wrapper.find('a[href^="/read/"]').exists()).toBe(false)
+    expect(wrapper.get('button[aria-label="Read"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('button[aria-label="Peek"]').attributes('disabled')).toBeDefined()
   })
 
   it('hides delete action when delete permission is missing', () => {

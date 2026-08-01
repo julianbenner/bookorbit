@@ -3,6 +3,7 @@ import type { Component } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 import { SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar'
 import AppIcon from '@/components/AppIcon.vue'
+import { isPlainPrimaryClick } from '@/lib/link-click'
 
 withDefaults(
   defineProps<{
@@ -17,10 +18,11 @@ withDefaults(
   { fallbackIcon: undefined, dataTour: undefined },
 )
 
-const emit = defineEmits<{ navigate: [] }>()
+const emit = defineEmits<{ navigate: [event: MouseEvent] }>()
 
-function handleNavigate() {
-  emit('navigate')
+function handleNavigate(event: MouseEvent) {
+  if (!isPlainPrimaryClick(event)) return
+  emit('navigate', event)
 }
 
 const slots = defineSlots<{

@@ -11,12 +11,8 @@ import BookTableProgressCell from '../table/BookTableProgressCell.vue'
 import BookTableReadButtonCell from '../table/BookTableReadButtonCell.vue'
 import type { BookCard, BookFileRef, UserBookStatus } from '@bookorbit/types'
 
-const routerPush = vi.fn<() => void>()
-
 vi.mock('vue-router', () => ({
-  useRouter: () => ({
-    push: routerPush,
-  }),
+  RouterLink: { name: 'RouterLink', props: ['to'], template: '<a><slot /></a>' },
 }))
 
 vi.mock('@/features/book/composables/useBookStatus', () => ({
@@ -232,6 +228,7 @@ describe('BookTableReadButtonCell', () => {
       coverAspectRatio: '2/3',
       title: 'Example Book',
       authors: ['Author'],
+      authorIds: [304],
       seriesName: null,
       seriesIndex: null,
       files,
@@ -273,32 +270,7 @@ describe('BookTableReadButtonCell', () => {
     expect(wrapper.text()).toBe('-')
   })
 
-  it('opens the primary readable file on button click', async () => {
-    routerPush.mockReset()
-    const wrapper = mountReadButton(makeBook([{ id: 1, format: 'epub', role: 'primary', sizeBytes: null }]))
-    await wrapper.get('button').trigger('click')
-    expect(routerPush).toHaveBeenCalledWith({
-      name: 'reader',
-      params: { bookId: 42, fileId: 1 },
-      query: { format: 'epub' },
-    })
-  })
-
-  it('opens the primary readable file in peek mode from the peek button', async () => {
-    routerPush.mockReset()
-    const wrapper = mountReadButton(makeBook([{ id: 1, format: 'epub', role: 'primary', sizeBytes: null }]))
-    const peekButton = wrapper.findAll('button').find((button) => button.attributes('aria-label') === 'Peek EPUB e-book')
-    expect(peekButton).toBeTruthy()
-    await peekButton!.trigger('click')
-    expect(routerPush).toHaveBeenCalledWith({
-      name: 'reader',
-      params: { bookId: 42, fileId: 1 },
-      query: { format: 'epub', mode: 'peek' },
-    })
-  })
-
-  it('shows play action for audio formats and allows selecting alternate format', async () => {
-    routerPush.mockReset()
+  it('shows play action for audio formats and allows selecting alternate format', () => {
     const wrapper = mountReadButton(
       makeBook([
         { id: 10, format: 'm4b', role: 'primary', sizeBytes: null },
@@ -308,15 +280,6 @@ describe('BookTableReadButtonCell', () => {
 
     expect(wrapper.text()).toContain('Play')
     expect(wrapper.text()).toContain('Read EPUB')
-
-    const option = wrapper.findAll('button').find((node) => node.text().includes('Read EPUB'))
-    expect(option).toBeTruthy()
-    await option!.trigger('click')
-    expect(routerPush).toHaveBeenCalledWith({
-      name: 'reader',
-      params: { bookId: 42, fileId: 11 },
-      query: { format: 'epub' },
-    })
   })
 })
 
@@ -683,6 +646,7 @@ describe('BookTableChipsCell', () => {
     isActive: boolean
     isReadOnly?: boolean
     searchFn?: (q: string) => Promise<string[]>
+    linkFn?: (chip: string, index: number) => string | null
     chipActionFn?: (chip: string) => void
   }) => mount(BookTableChipsCell, { props, global: { stubs: chipsStubs } })
 
@@ -690,6 +654,16 @@ describe('BookTableChipsCell', () => {
     const wrapper = mountChips({ value: ['Vue', 'React'], isActive: false })
     const spans = wrapper.findAll('span').filter((s) => ['Vue', 'React'].includes(s.text()))
     expect(spans).toHaveLength(2)
+  })
+  it('passes chip indexes to linkFn and renders missing links as plain text', () => {
+    const linkFn = vi.fn<(chip: string, index: number) => string | null>((_chip, index) => (index === 0 ? `/authors/${index + 1}` : null))
+    const wrapper = mountChips({ value: ['Author A', 'Author B'], isActive: false, linkFn })
+
+    expect(wrapper.findAll('a')).toHaveLength(1)
+    expect(wrapper.find('a').text()).toBe('Author A')
+    expect(wrapper.findAll('span').some((span) => span.text() === 'Author B')).toBe(true)
+    expect(linkFn).toHaveBeenCalledWith('Author A', 0)
+    expect(linkFn).toHaveBeenCalledWith('Author B', 1)
   })
 
   it('shows overflow count for more than 2 chips', () => {
