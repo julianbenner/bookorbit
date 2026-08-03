@@ -67,6 +67,7 @@ const missingBook: BookCard = {
   coverAspectRatio: '2/3',
   title: 'Gone Book',
   authors: ['Test Author'],
+  authorIds: [7],
   seriesName: null,
   seriesIndex: null,
   files: [],
@@ -98,6 +99,7 @@ const presentBook: BookCard = {
   coverAspectRatio: '2/3',
   title: 'Available Book',
   authors: ['Test Author'],
+  authorIds: [7],
   seriesName: null,
   seriesIndex: null,
   files: [{ id: 10, format: 'epub', role: 'primary', sizeBytes: null }],
@@ -128,6 +130,7 @@ const collapsedSeriesBook: BookCard = {
   id: 20,
   title: 'Representative Volume',
   authors: ['Series Author'],
+  authorIds: [8],
   seriesId: 99,
   seriesName: 'The Trilogy',
   seriesIndex: 1,
@@ -197,6 +200,35 @@ describe('BookListRow - present state', () => {
     expect(link.props('to')).toEqual({ name: 'book-detail', params: { bookId: 2 } })
     expect(wrapper.emitted('action')).toBeUndefined()
     expect(routerPushMock).not.toHaveBeenCalled()
+  })
+
+  it('covers the whole row with a book detail link when details are preferred', () => {
+    thumbnailClickAction.value = 'details'
+    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+    const overlay = wrapper.find('[data-testid="book-list-row-link"]')
+
+    expect(overlay.exists()).toBe(true)
+    expect(wrapper.findComponent(RouterLinkStub).props('to')).toEqual({ name: 'book-detail', params: { bookId: 2 } })
+  })
+
+  it('does not cover the row with a link when clicks open the quick view', () => {
+    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+
+    expect(wrapper.find('[data-testid="book-list-row-link"]').exists()).toBe(false)
+  })
+
+  it('links the author line to the author detail page', () => {
+    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+    const link = wrapper.findAllComponents(RouterLinkStub).find((candidate) => candidate.text().trim() === 'Test Author')
+
+    expect(link?.props('to')).toEqual({ name: 'author-detail', params: { id: 7 } })
+  })
+
+  it('renders the author line as plain text when no author id is known', () => {
+    const wrapper = mount(BookListRow, { props: { book: { ...presentBook, authorIds: [] } }, global: globalStubs })
+
+    expect(wrapper.findAllComponents(RouterLinkStub).some((candidate) => candidate.text().trim() === 'Test Author')).toBe(false)
+    expect(wrapper.text()).toContain('Test Author')
   })
   it('selects instead of navigating in selection mode', async () => {
     thumbnailClickAction.value = 'details'

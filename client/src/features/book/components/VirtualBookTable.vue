@@ -152,8 +152,14 @@ function getChipsSearchFn(colId: string): (q: string) => Promise<string[]> {
   return () => Promise.resolve([])
 }
 
-function getChipsLinkFn(colId: string): ((chip: string) => string | null) | undefined {
-  if (colId === 'authors') return (name) => `/authors?q=${encodeURIComponent(name)}`
+function getChipsLinkFn(book: BookCard, colId: string): ((chip: string, index: number) => string | null) | undefined {
+  if (colId === 'authors') {
+    return (_chip, index) => {
+      const authorId = book.authorIds?.[index]
+      if (authorId != null) return `/authors/${authorId}`
+      return null
+    }
+  }
   return undefined
 }
 
@@ -880,7 +886,7 @@ defineExpose({
                     :search-fn="col.cellType === 'text' ? getTextSearchFn(col.id) : col.cellType === 'chips' ? getChipsSearchFn(col.id) : undefined"
                     :open-link="col.cellType === 'text' ? getTextCellOpenLink(rowBook(vItem.index), col.id) : undefined"
                     :open-link-label="col.cellType === 'text' ? getTextCellOpenLinkLabel(col.id) : undefined"
-                    :link-fn="col.cellType === 'chips' ? getChipsLinkFn(col.id) : undefined"
+                    :link-fn="col.cellType === 'chips' ? getChipsLinkFn(rowBook(vItem.index), col.id) : undefined"
                     :chip-action-fn="col.cellType === 'chips' ? getChipsActionFn(col.id) : undefined"
                     :allow-decimal="col.id === 'seriesIndex'"
                     @activate="handleActivate(rowBook(vItem.index), col.id)"

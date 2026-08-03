@@ -10,8 +10,6 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: hasPermissionMock, isDemoRestrictedAccount: { value: false } }),
 }))
 
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn<(to: unknown) => void>() }) }))
-
 vi.mock('@/features/book/composables/useRefreshMetadata', () => ({
   useRefreshMetadata: () => ({ refreshWithFeedback: vi.fn<() => Promise<null>>(), refreshing: { value: false } }),
 }))
@@ -34,7 +32,7 @@ function mountMenu() {
   return mount(BookTableContextMenu, {
     props: { book, position: { x: 100, y: 100 } },
     global: {
-      stubs: { SendBookDialog: true, Teleport: true },
+      stubs: { SendBookDialog: true, Teleport: true, RouterLink: { template: '<a><slot /></a>' } },
     },
   })
 }

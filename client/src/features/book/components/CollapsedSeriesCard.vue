@@ -27,7 +27,7 @@ const { seriesCardCoverMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardI
 const collapsed = computed(() => props.book.collapsedSeries!)
 const seriesName = computed(() => props.book.seriesName ?? '')
 const authorLine = computed(() => props.book.authors.join(', ') || null)
-const authorQuery = computed(() => props.book.authors[0] ?? null)
+const primaryAuthorId = computed(() => props.book.authorIds?.[0] ?? null)
 const hoverTitleClampClass = computed(() => (coverAspectRatio.value === '1/1' ? 'line-clamp-1' : 'line-clamp-2'))
 const showHoverText = computed(() => cardInfoMode.value === 'hover-overlay')
 const overlayBackground = computed(() => (cardInfoMode.value === 'hover-overlay' ? 'bg-black/70' : 'bg-black/20'))
@@ -111,7 +111,10 @@ function coverVersionFor(bookId: number): string | null | undefined {
 const seriesRoute = computed(() =>
   props.book.seriesId == null ? null : { name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } },
 )
-const authorRoute = computed(() => (authorQuery.value ? { name: 'authors', query: { q: authorQuery.value } } : null))
+const authorRoute = computed(() => {
+  const authorId = primaryAuthorId.value
+  return authorId != null ? { name: 'author-detail', params: { id: authorId } } : null
+})
 
 function labelRoute(field: GridCardLabelField) {
   return field === 'author' ? authorRoute.value : seriesRoute.value
@@ -301,7 +304,7 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
             <p class="text-xs font-semibold text-white leading-tight" :class="hoverTitleClampClass">
               {{ seriesName }}
             </p>
-            <p v-if="authorLine" class="text-[10px] text-white/70 truncate mt-0.5">
+            <p v-if="authorLine" class="text-[10px] text-white/70 truncate mt-0.5 cursor-default">
               {{ authorLine }}
             </p>
           </div>
@@ -323,7 +326,9 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
       >
         {{ primaryLabelText }}
       </RouterLink>
-      <span v-else-if="primaryLabelText" class="grid-card-label__primary">{{ primaryLabelText }}</span>
+      <span v-else-if="primaryLabelText" class="grid-card-label__primary cursor-default" data-testid="grid-card-label-primary">{{
+        primaryLabelText
+      }}</span>
       <RouterLink
         v-if="secondaryLabelText && secondaryLabelRoute"
         :to="secondaryLabelRoute"
@@ -332,7 +337,9 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
       >
         {{ secondaryLabelText }}
       </RouterLink>
-      <span v-else-if="secondaryLabelText" class="grid-card-label__secondary">{{ secondaryLabelText }}</span>
+      <span v-else-if="secondaryLabelText" class="grid-card-label__secondary cursor-default" data-testid="grid-card-label-secondary">{{
+        secondaryLabelText
+      }}</span>
     </div>
   </div>
 </template>

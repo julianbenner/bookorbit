@@ -20,6 +20,7 @@ function makeBook(format: string | null): BookCard {
     coverAspectRatio: '2/3',
     title: 'Saga',
     authors: [],
+    authorIds: [],
     seriesName: 'Saga',
     seriesId: 42,
     seriesIndex: null,

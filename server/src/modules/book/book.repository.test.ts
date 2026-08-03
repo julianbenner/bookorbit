@@ -92,7 +92,7 @@ describe('BookRepository', () => {
 
   it('findCards loads card rows and related collections for the current user', async () => {
     const rows = [{ id: 10, primaryFileId: 1001, _total: 1 }];
-    const authorRows = [{ bookId: 10, name: 'Frank Herbert' }];
+    const authorRows = [{ bookId: 10, authorId: 1, name: 'Frank Herbert' }];
     const fileRows = [{ bookId: 10, id: 1001, format: 'epub', role: 'primary' }];
     const genreRows = [{ bookId: 10, name: 'Sci-Fi' }];
     const tagRows = [{ bookId: 10, name: 'dune' }];

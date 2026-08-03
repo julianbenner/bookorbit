@@ -57,6 +57,7 @@ function makeBook(overrides?: Partial<BookCard>): BookCard {
     coverAspectRatio: '2/3',
     title: 'Book One',
     authors: ['Author A'],
+    authorIds: [202],
     seriesId: 42,
     seriesName: 'The Arc',
     seriesIndex: 1,
@@ -725,14 +726,24 @@ describe('CollapsedSeriesCard', () => {
       expect(wrapper.find('[data-testid="grid-card-label-primary"]').exists()).toBe(false)
     })
 
-    it('links the author label directly to the authors search page', () => {
+    it('links the author label directly to the author detail page', () => {
       gridCardSecondaryLabel.value = 'author'
       const wrapper = mountWithBelowCoverLabel()
       const secondary = wrapper.find('[data-testid="grid-card-label-secondary"]')
       const link = wrapper.findAllComponents(RouterLinkStub).find((candidate) => candidate.text() === 'Author A')
 
       expect(secondary.element.tagName).toBe('A')
-      expect(link?.props('to')).toEqual({ name: 'authors', query: { q: 'Author A' } })
+      expect(link?.props('to')).toEqual({ name: 'author-detail', params: { id: 202 } })
+    })
+
+    it('renders a missing author id as plain text', () => {
+      gridCardSecondaryLabel.value = 'author'
+      const wrapper = mountWithBelowCoverLabel({ authorIds: [] })
+      const secondary = wrapper.find('[data-testid="grid-card-label-secondary"]')
+
+      expect(secondary.element.tagName).toBe('SPAN')
+      expect(secondary.classes()).toContain('cursor-default')
+      expect(wrapper.findAllComponents(RouterLinkStub).some((candidate) => candidate.text() === 'Author A')).toBe(false)
     })
 
     it('does not render an author label when no authors are present', () => {

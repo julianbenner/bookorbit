@@ -48,6 +48,7 @@ type CollapsedBookRow = BookRow & {
   firstUnreadBookId: number | null;
 };
 
+type AuthorRow = { bookId: number; authorId: number; name: string };
 type NameRow = { bookId: number; name: string };
 type NarratorRow = { bookId: number; name: string };
 type FileRow = { bookId: number; id: number; format: string | null; role: string; sizeBytes: number | null };
@@ -88,7 +89,7 @@ function serializeDateByBookId(values: Record<number, Date | null> | null | unde
 
 export function assembleBookCards(
   rows: BookRow[],
-  authorRows: NameRow[],
+  authorRows: AuthorRow[],
   fileRows: FileRow[],
   genreRows: NameRow[],
   progressRows: ProgressRow[],
@@ -98,11 +99,12 @@ export function assembleBookCards(
   seriesMembershipRows: SeriesMembershipRow[] = [],
   customMetadataRows: CustomMetadataRow[] = [],
 ): BookCard[] {
-  const authorsByBook = new Map<number, string[]>();
+  const authorsByBook = new Map<number, { names: string[]; authorIds: number[] }>();
   for (const row of authorRows) {
-    const list = authorsByBook.get(row.bookId) ?? [];
-    list.push(row.name);
-    authorsByBook.set(row.bookId, list);
+    const authorData = authorsByBook.get(row.bookId) ?? { names: [], authorIds: [] };
+    authorData.names.push(row.name);
+    authorData.authorIds.push(row.authorId);
+    authorsByBook.set(row.bookId, authorData);
   }
 
   const filesByBook = new Map<number, { id: number; format: string | null; role: string; sizeBytes: number | null }[]>();
@@ -185,6 +187,7 @@ export function assembleBookCards(
       sizeBytes: f.sizeBytes,
     }));
     const readingProgress = primaryFile != null ? (progressByFileId.get(primaryFile.id) ?? null) : null;
+    const authorData = authorsByBook.get(row.id);
 
     return {
       id: row.id,
@@ -204,7 +207,8 @@ export function assembleBookCards(
           displayOrder: membership.displayOrder,
           expectedBookCount: membership.expectedBookCount ?? null,
         })),
-      authors: authorsByBook.get(row.id) ?? [],
+      authors: authorData?.names ?? [],
+      authorIds: authorData?.authorIds ?? [],
       files,
       publishedDate: row.publishedDate ?? null,
       publishedYear: row.publishedYear ?? null,
@@ -234,7 +238,7 @@ export function assembleBookCards(
 
 export function assembleCollapsedBookCards(
   rows: CollapsedBookRow[],
-  authorRows: NameRow[],
+  authorRows: AuthorRow[],
   fileRows: FileRow[],
   genreRows: NameRow[],
   progressRows: ProgressRow[],

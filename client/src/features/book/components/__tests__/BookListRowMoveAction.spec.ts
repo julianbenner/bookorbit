@@ -16,6 +16,7 @@ const book: BookCard = {
   coverAspectRatio: '2/3',
   title: 'Dune',
   authors: ['Frank Herbert'],
+  authorIds: [11],
   seriesName: null,
   seriesIndex: null,
   files: [],

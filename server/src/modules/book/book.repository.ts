@@ -600,7 +600,7 @@ export class BookRepository {
 
     if (bookIds.length === 0) {
       return {
-        authorRows: [] as { bookId: number; name: string }[],
+        authorRows: [] as { bookId: number; authorId: number; name: string }[],
         fileRows: [] as { bookId: number; id: number; format: string | null; role: string; sizeBytes: number | null }[],
         genreRows: [] as { bookId: number; name: string }[],
         tagRows: [] as { bookId: number; name: string }[],
@@ -628,7 +628,7 @@ export class BookRepository {
     const [authorRows, fileRows, genreRows, tagRows, narratorRows, seriesMembershipRows, statusRows, fileProgressRows, audiobookProgressRows] =
       await Promise.all([
         this.db
-          .select({ bookId: bookAuthors.bookId, name: authors.name })
+          .select({ bookId: bookAuthors.bookId, authorId: authors.id, name: authors.name })
           .from(bookAuthors)
           .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
           .where(inArray(bookAuthors.bookId, bookIds))
@@ -786,7 +786,7 @@ export class BookRepository {
       latestVolumeBookId: number | null;
       firstUnreadBookId: number | null;
     }>;
-    authorRows: { bookId: number; name: string }[];
+    authorRows: { bookId: number; authorId: number; name: string }[];
     fileRows: { bookId: number; id: number; format: string | null; role: string; sizeBytes: number | null }[];
     genreRows: { bookId: number; name: string }[];
     tagRows: { bookId: number; name: string }[];

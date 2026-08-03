@@ -84,7 +84,8 @@ const collapsedProgressPercent = computed(() => {
   return Math.min(100, Math.max(0, (collapsedReadCount.value / collapsedBookCount.value) * 100))
 })
 const authorLine = computed(() => props.book.authors.join(', ') || null)
-const authorQuery = computed(() => props.book.authors[0] ?? null)
+const primaryAuthorId = computed(() => props.book.authorIds?.[0] ?? null)
+const authorRoute = computed(() => (primaryAuthorId.value == null ? null : { name: 'author-detail', params: { id: primaryAuthorId.value } }))
 const seriesLine = computed(() => {
   if (!props.book.seriesName) return null
   const idx = props.book.seriesIndex
@@ -165,6 +166,11 @@ function peekPrimaryFile() {
 
 const bookDetailRoute = computed(() => ({ name: 'book-detail', params: { bookId: props.book.id } }))
 const seriesDetailRoute = computed(() => (props.book.seriesId == null ? null : { name: 'series-detail', params: { seriesId: props.book.seriesId } }))
+const rowRoute = computed(() => {
+  if (props.selectionMode) return null
+  if (isCollapsedSeries.value) return seriesDetailRoute.value
+  return thumbnailClickAction.value === 'details' ? bookDetailRoute.value : null
+})
 
 function collapsedCoverVersion(bookId: number): string | null | undefined {
   if (bookId === props.book.id) return props.book.updatedAt ?? props.book.addedAt
@@ -191,13 +197,22 @@ function handleRowClick(event: MouseEvent) {
   <div
     v-if="isCollapsedSeries"
     data-testid="collapsed-series-list-row"
-    class="flex items-center gap-3 py-3 px-2 rounded-md transition-colors"
+    class="relative flex items-center gap-3 py-3 px-2 rounded-md transition-colors"
     :class="[
       selectionMode ? 'cursor-pointer select-none' : canOpenSeries ? 'cursor-pointer hover:bg-muted/50' : 'cursor-default',
       selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
     ]"
     @click="handleRowClick"
   >
+    <RouterLink
+      v-if="rowRoute"
+      :to="rowRoute"
+      class="absolute inset-0 z-0 rounded-md"
+      tabindex="-1"
+      aria-hidden="true"
+      data-testid="collapsed-series-list-row-link"
+    />
+
     <div
       v-if="selectionMode"
       class="h-5 w-5 rounded shrink-0 flex items-center justify-center transition-colors"
@@ -249,7 +264,7 @@ function handleRowClick(event: MouseEvent) {
         <RouterLink
           v-if="!selectionMode && seriesDetailRoute"
           :to="seriesDetailRoute"
-          class="truncate text-sm font-semibold leading-snug text-foreground hover:underline"
+          class="relative z-10 truncate text-sm font-semibold leading-snug text-foreground hover:underline"
         >
           {{ collapsedSeriesName }}
         </RouterLink>
@@ -259,9 +274,9 @@ function handleRowClick(event: MouseEvent) {
         </span>
       </div>
       <RouterLink
-        v-if="authorLine && authorQuery && !selectionMode"
-        :to="{ name: 'authors', query: { q: authorQuery } }"
-        class="w-fit max-w-full truncate text-xs text-muted-foreground hover:underline"
+        v-if="authorLine && authorRoute && !selectionMode"
+        :to="authorRoute"
+        class="relative z-10 w-fit max-w-full truncate text-xs text-muted-foreground hover:underline"
       >
         {{ authorLine }}
       </RouterLink>
@@ -288,7 +303,7 @@ function handleRowClick(event: MouseEvent) {
   </div>
   <div
     v-else
-    class="flex items-center gap-3 py-3 px-2 rounded-md transition-colors cursor-pointer"
+    class="relative flex items-center gap-3 py-3 px-2 rounded-md transition-colors cursor-pointer"
     :class="[
       selectionMode ? 'cursor-pointer select-none' : '',
       selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
@@ -296,6 +311,15 @@ function handleRowClick(event: MouseEvent) {
     ]"
     @click="handleRowClick"
   >
+    <RouterLink
+      v-if="rowRoute"
+      :to="rowRoute"
+      class="absolute inset-0 z-0 rounded-md"
+      tabindex="-1"
+      aria-hidden="true"
+      data-testid="book-list-row-link"
+    />
+
     <!-- Selection checkbox -->
     <div
       v-if="selectionMode"
@@ -333,7 +357,7 @@ function handleRowClick(event: MouseEvent) {
       <RouterLink
         v-if="!selectionMode && thumbnailClickAction === 'details'"
         :to="bookDetailRoute"
-        class="text-sm font-medium text-foreground truncate leading-snug hover:underline"
+        class="relative z-10 w-fit max-w-full text-sm font-medium text-foreground truncate leading-snug hover:underline"
         :class="isMissing ? 'opacity-60' : ''"
       >
         {{ book.title ?? '-' }}
@@ -341,7 +365,7 @@ function handleRowClick(event: MouseEvent) {
       <button
         v-else-if="!selectionMode"
         type="button"
-        class="w-fit max-w-full text-left text-sm font-medium text-foreground truncate leading-snug hover:underline"
+        class="relative z-10 w-fit max-w-full text-left text-sm font-medium text-foreground truncate leading-snug hover:underline"
         :class="isMissing ? 'opacity-60' : ''"
         @click.stop="emit('action', 'quick-view')"
       >
@@ -351,9 +375,9 @@ function handleRowClick(event: MouseEvent) {
         book.title ?? '-'
       }}</span>
       <RouterLink
-        v-if="authorLine && authorQuery && !selectionMode"
-        :to="{ name: 'authors', query: { q: authorQuery } }"
-        class="w-fit max-w-full text-xs text-muted-foreground truncate hover:underline"
+        v-if="authorLine && authorRoute && !selectionMode"
+        :to="authorRoute"
+        class="relative z-10 w-fit max-w-full text-xs text-muted-foreground truncate hover:underline"
       >
         {{ authorLine }}
       </RouterLink>
@@ -374,7 +398,7 @@ function handleRowClick(event: MouseEvent) {
     </div>
 
     <!-- Right badges + actions -->
-    <div v-if="!selectionMode" class="flex items-center gap-1.5 shrink-0" @click.stop>
+    <div v-if="!selectionMode" class="relative z-10 flex items-center gap-1.5 shrink-0" @click.stop>
       <!-- Star rating -->
       <div class="hidden sm:flex items-center gap-0.5" @mouseleave="hoverRating = null">
         <Tooltip v-for="star in RATING_STARS" :key="star">

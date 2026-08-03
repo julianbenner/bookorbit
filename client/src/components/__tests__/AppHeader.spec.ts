@@ -140,6 +140,7 @@ function makeResult(id: number, title = 'Prey'): GlobalSearchResult {
     coverAspectRatio: '2/3',
     title,
     authors: ['Author'],
+    authorIds: [],
     seriesId: null,
     seriesName: null,
     seriesIndex: null,

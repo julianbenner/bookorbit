@@ -225,6 +225,7 @@ describe('BookTableReadButtonCell', () => {
       coverAspectRatio: '2/3',
       title: 'Example Book',
       authors: ['Author'],
+      authorIds: [304],
       seriesName: null,
       seriesIndex: null,
       files,
@@ -680,6 +681,7 @@ describe('BookTableChipsCell', () => {
     isActive: boolean
     isReadOnly?: boolean
     searchFn?: (q: string) => Promise<string[]>
+    linkFn?: (chip: string, index: number) => string | null
     chipActionFn?: (chip: string) => void
   }) => mount(BookTableChipsCell, { props, global: { stubs: chipsStubs } })
 
@@ -687,6 +689,16 @@ describe('BookTableChipsCell', () => {
     const wrapper = mountChips({ value: ['Vue', 'React'], isActive: false })
     const spans = wrapper.findAll('span').filter((s) => ['Vue', 'React'].includes(s.text()))
     expect(spans).toHaveLength(2)
+  })
+  it('passes chip indexes to linkFn and renders missing links as plain text', () => {
+    const linkFn = vi.fn<(chip: string, index: number) => string | null>((_chip, index) => (index === 0 ? `/authors/${index + 1}` : null))
+    const wrapper = mountChips({ value: ['Author A', 'Author B'], isActive: false, linkFn })
+
+    expect(wrapper.findAll('a')).toHaveLength(1)
+    expect(wrapper.find('a').text()).toBe('Author A')
+    expect(wrapper.findAll('span').some((span) => span.text() === 'Author B')).toBe(true)
+    expect(linkFn).toHaveBeenCalledWith('Author A', 0)
+    expect(linkFn).toHaveBeenCalledWith('Author B', 1)
   })
 
   it('shows overflow count for more than 2 chips', () => {

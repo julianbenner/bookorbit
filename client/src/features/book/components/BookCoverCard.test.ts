@@ -137,7 +137,7 @@ function makeBook(overrides: Partial<BookCard> = {}): BookCard {
     coverAspectRatio: '2/3',
     title: 'Dune',
     authors: ['Frank Herbert'],
-    seriesId: null,
+    authorIds: [101],
     seriesName: null,
     seriesIndex: null,
     files: [makeFile()],
@@ -397,13 +397,13 @@ describe('BookCoverCard', () => {
       expect(label?.props('to')).toEqual({ name: 'book-detail', params: { bookId: 42 } })
     })
 
-    it('links the author label to the authors search page', () => {
+    it('links the author label to the author detail page', () => {
       mockCardInfoMode.value = 'below-cover'
       mockGridCardSecondaryLabel.value = 'author'
       const wrapper = mountCard({ book: makeBook({ id: 43 }), showLabel: true })
       const label = wrapper.findAllComponents(RouterLinkStub).find((link) => link.text().trim() === 'Frank Herbert')
 
-      expect(label?.props('to')).toEqual({ name: 'authors', query: { q: 'Frank Herbert' } })
+      expect(label?.props('to')).toEqual({ name: 'author-detail', params: { id: 101 } })
     })
 
     it('links the series label to the series detail route with the current path', () => {
@@ -518,18 +518,26 @@ describe('BookCoverCard', () => {
   // ── author browse navigation ──────────────────────────────────────────────
 
   describe('author browse', () => {
-    it('renders an authors link in the hover overlay', () => {
+    it('renders an author detail link in the hover overlay', () => {
       const wrapper = mountCard({ book: makeBook({ hasCover: false, authors: ['Frank Herbert'] }) })
       const authorLink = wrapper.findAllComponents(RouterLinkStub).find((link) => link.text().includes('Frank Herbert'))
 
-      expect(authorLink?.props('to')).toEqual({ name: 'authors', query: { q: 'Frank Herbert' } })
+      expect(authorLink?.props('to')).toEqual({ name: 'author-detail', params: { id: 101 } })
+    })
+
+    it('renders the author label as plain text when the author id is missing', () => {
+      const wrapper = mountCard({ book: makeBook({ hasCover: false, authorIds: [] }) })
+      const authorLabel = wrapper.find('span.cursor-default')
+
+      expect(authorLabel.text()).toBe('Frank Herbert')
+      expect(wrapper.findAllComponents(RouterLinkStub).some((link) => link.text().includes('Frank Herbert'))).toBe(false)
     })
 
     it('does not navigate when authors array is empty', async () => {
       const book = makeBook({ hasCover: false, authors: [] })
       const wrapper = mountCard({ book })
       await wrapper.find('.group').trigger('click')
-      expect(mockRouterPush).not.toHaveBeenCalledWith(expect.objectContaining({ name: 'authors' }))
+      expect(mockRouterPush).not.toHaveBeenCalled()
     })
   })
 

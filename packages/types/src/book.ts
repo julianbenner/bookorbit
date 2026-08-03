@@ -127,6 +127,7 @@ export type BookCard = {
   coverAspectRatio: CoverAspectRatio;
   title: string | null;
   authors: string[];
+  authorIds: number[];
   seriesId?: number | null;
   seriesName: string | null;
   seriesIndex: number | null;

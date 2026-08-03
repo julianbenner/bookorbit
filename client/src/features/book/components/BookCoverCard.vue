@@ -75,7 +75,11 @@ const emit = defineEmits<{
 }>()
 
 const authorLine = computed(() => props.book.authors.join(', ') || null)
-const authorQuery = computed(() => props.book.authors[0] ?? null)
+const primaryAuthorId = computed(() => props.book.authorIds?.[0] ?? null)
+const authorRoute = computed(() => {
+  const authorId = primaryAuthorId.value
+  return authorId != null ? { name: 'author-detail', params: { id: authorId } } : null
+})
 
 const readableFiles = computed(() => props.book.files.filter((f) => f.format && READER_OPENABLE_FORMATS.has(f.format)))
 const primaryFile = computed(() => readableFiles.value.find((f) => f.role === 'primary') ?? readableFiles.value[0] ?? null)
@@ -207,7 +211,7 @@ const primaryRoute = computed(() =>
 
 function labelRoute(field: GridCardLabelField) {
   if (field === 'book-title') return bookDetailRoute.value
-  if (field === 'author' && authorQuery.value) return { name: 'authors', query: { q: authorQuery.value } }
+  if (field === 'author') return authorRoute.value
   if ((field === 'series-title' || field === 'series-title-position') && props.book.seriesId != null) {
     return { name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } }
   }
@@ -216,6 +220,8 @@ function labelRoute(field: GridCardLabelField) {
 
 const primaryLabelRoute = computed(() => labelRoute(gridCardPrimaryLabel.value))
 const secondaryLabelRoute = computed(() => labelRoute(gridCardSecondaryLabel.value))
+const primaryLabelIsPlainText = computed(() => gridCardPrimaryLabel.value === 'author' && primaryLabelRoute.value == null)
+const secondaryLabelIsPlainText = computed(() => gridCardSecondaryLabel.value === 'author' && secondaryLabelRoute.value == null)
 
 function peekPrimaryFile() {
   if (!primaryFile.value || isMissing.value) return
@@ -508,12 +514,15 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
               </div>
 
               <RouterLink
-                v-if="showAuthorOnHover && authorQuery"
-                :to="{ name: 'authors', query: { q: authorQuery } }"
+                v-if="showAuthorOnHover && authorRoute"
+                :to="authorRoute"
                 class="text-[10px] text-white/70 truncate hover:underline text-left block w-full"
               >
                 {{ authorLine }}
               </RouterLink>
+              <span v-else-if="showAuthorOnHover && authorLine" class="text-[10px] text-white/70 truncate text-left block w-full cursor-default">
+                {{ authorLine }}
+              </span>
             </div>
 
             <!-- Kebab menu anchored to lower-right (not in below-cover mode, where it lives in the label row) -->
@@ -667,6 +676,13 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
         >
           {{ primaryLabelText }}
         </RouterLink>
+        <span
+          v-else-if="primaryLabelText && primaryLabelIsPlainText"
+          class="grid-card-label__primary min-w-0 flex-1 truncate cursor-default"
+          data-testid="grid-card-label-primary"
+        >
+          {{ primaryLabelText }}
+        </span>
         <button
           v-else-if="primaryLabelText"
           type="button"
@@ -809,6 +825,13 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
       >
         {{ secondaryLabelText }}
       </RouterLink>
+      <span
+        v-else-if="secondaryLabelText && secondaryLabelIsPlainText"
+        class="grid-card-label__secondary w-full cursor-default"
+        data-testid="grid-card-label-secondary"
+      >
+        {{ secondaryLabelText }}
+      </span>
       <button
         v-else-if="secondaryLabelText"
         type="button"

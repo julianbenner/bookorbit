@@ -29,7 +29,7 @@ function makeBookRow(id: number, overrides?: Partial<Parameters<typeof assembleB
 describe('assembleBookCards', () => {
   it('assembles a simple book card with authors and files', () => {
     const rows = [makeBookRow(1)];
-    const authorRows = [{ bookId: 1, name: 'Author A' }];
+    const authorRows = [{ bookId: 1, authorId: 1, name: 'Author A' }];
     const fileRows = [{ bookId: 1, id: 10, format: 'epub', role: 'primary', sizeBytes: null }];
 
     const [card] = assembleBookCards(rows, authorRows, fileRows, [], []);
@@ -37,6 +37,7 @@ describe('assembleBookCards', () => {
     expect(card.id).toBe(1);
     expect(card.title).toBe('Book 1');
     expect(card.authors).toEqual(['Author A']);
+    expect(card.authorIds).toEqual([1]);
     expect(card.files).toEqual([{ id: 10, format: 'epub', role: 'primary', sizeBytes: null }]);
     expect(card.coverAspectRatio).toBe('2/3');
   });
@@ -142,14 +143,17 @@ describe('assembleBookCards', () => {
   it('processes multiple books independently', () => {
     const rows = [makeBookRow(1), makeBookRow(2)];
     const authorRows = [
-      { bookId: 1, name: 'Author A' },
-      { bookId: 2, name: 'Author B' },
+      { bookId: 1, authorId: 1, name: 'Author A' },
+      { bookId: 1, authorId: 2, name: 'Author B' },
+      { bookId: 2, authorId: 3, name: 'Author C' },
     ];
 
     const cards = assembleBookCards(rows, authorRows, [], [], []);
 
-    expect(cards[0].authors).toEqual(['Author A']);
-    expect(cards[1].authors).toEqual(['Author B']);
+    expect(cards[0].authors).toEqual(['Author A', 'Author B']);
+    expect(cards[0].authorIds).toEqual([1, 2]);
+    expect(cards[1].authors).toEqual(['Author C']);
+    expect(cards[1].authorIds).toEqual([3]);
   });
 
   it('returns empty arrays for books with no related data', () => {
@@ -157,6 +161,7 @@ describe('assembleBookCards', () => {
     const [card] = assembleBookCards(rows, [], [], [], []);
 
     expect(card.authors).toEqual([]);
+    expect(card.authorIds).toEqual([]);
     expect(card.files).toEqual([]);
     expect(card.genres).toEqual([]);
   });
@@ -371,6 +376,7 @@ function makeBookCard(id: number, overrides?: Record<string, unknown>) {
     coverAspectRatio: '2/3' as const,
     title: `Book ${id}`,
     authors: [] as string[],
+    authorIds: [] as number[],
     seriesName: null as string | null,
     seriesIndex: null as number | null,
     files: [] as { id: number; format: string | null; role: string }[],
@@ -478,11 +484,12 @@ describe('assembleCollapsedBookCards', () => {
 
   it('preserves base card fields alongside collapsedSeries', () => {
     const rows = [makeCollapsedRow(10, { title: 'Book Ten' })];
-    const authorRows = [{ bookId: 10, name: 'Author X' }];
+    const authorRows = [{ bookId: 10, authorId: 10, name: 'Author X' }];
     const [card] = assembleCollapsedBookCards(rows, authorRows, [], [], []);
 
     expect(card!.title).toBe('Book Ten');
     expect(card!.authors).toEqual(['Author X']);
+    expect(card!.authorIds).toEqual([10]);
     expect(card!.collapsedSeries).toBeDefined();
   });
 });
